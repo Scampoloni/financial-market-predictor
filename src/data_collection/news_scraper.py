@@ -200,6 +200,8 @@ def fetch_newsapi(ticker: str, company_name: str, page_size: int = 100) -> pd.Da
     """Fetch headlines from NewsAPI for a specific ticker.
 
     Requires NEWS_API_KEY in .env. Returns empty DataFrame if key is missing.
+    The free tier returns the 100 most recent articles (last ~24-48h).
+    Date filtering (from/to) requires a paid NewsAPI plan.
 
     Args:
         ticker: Ticker symbol.
@@ -226,7 +228,12 @@ def fetch_newsapi(ticker: str, company_name: str, page_size: int = 100) -> pd.Da
             "https://newsapi.org/v2/everything", params=params, timeout=10
         )
         resp.raise_for_status()
-        articles = resp.json().get("articles", [])
+        data = resp.json()
+        articles = data.get("articles", [])
+        logger.info(
+            "%s: NewsAPI returned %d articles (total available: %s)",
+            ticker, len(articles), data.get("totalResults", "?"),
+        )
 
         rows = [
             {
@@ -237,7 +244,7 @@ def fetch_newsapi(ticker: str, company_name: str, page_size: int = 100) -> pd.Da
                 "source": a.get("source", {}).get("name", "NewsAPI"),
             }
             for a in articles
-            if a.get("title")
+            if (a.get("title") or "").strip()
         ]
         return pd.DataFrame(rows)
     except Exception as exc:
