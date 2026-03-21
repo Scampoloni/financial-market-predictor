@@ -57,15 +57,19 @@ def _clean_ohlcv(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
     df.index.name = "Date"
     df.sort_index(inplace=True)
 
-    # Drop rows where all OHLC are NaN or volume is zero
-    df = df[df["Volume"] > 0].dropna(subset=["Open", "High", "Low", "Close"])
+    # Drop rows where OHLC are NaN; skip volume filter for indices (Volume=0 is normal)
+    is_index = ticker.startswith("^")
+    if not is_index:
+        df = df[df["Volume"] > 0]
+    df = df.dropna(subset=["Open", "High", "Low", "Close"])
 
-    # Filter penny stocks (close < MIN_STOCK_PRICE on most days)
-    median_close = df["Close"].median()
-    if median_close < MIN_STOCK_PRICE:
-        raise ValueError(
-            f"{ticker}: median close {median_close:.2f} < {MIN_STOCK_PRICE} (penny stock)"
-        )
+    # Filter penny stocks (close < MIN_STOCK_PRICE on most days) — skip for indices
+    if not ticker.startswith("^"):
+        median_close = df["Close"].median()
+        if median_close < MIN_STOCK_PRICE:
+            raise ValueError(
+                f"{ticker}: median close {median_close:.2f} < {MIN_STOCK_PRICE} (penny stock)"
+            )
 
     return df
 
