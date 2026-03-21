@@ -478,6 +478,18 @@ Must contain:
 - Authors
 
 ### Notebooks (complete, clean, with markdown explanations)
+
+#### Notebook Writing Standard (applies to ALL notebooks)
+Every notebook must follow this pattern throughout:
+- **Before each code cell:** A short markdown cell (1–3 sentences, English) explaining
+  what the code does and why — e.g. "We compute RSI using a 14-day window. RSI > 70
+  indicates overbought conditions; RSI < 30 indicates oversold."
+- **After each output / result:** A short markdown cell interpreting the result —
+  e.g. "The correlation of 0.34 between sentiment and next-day return is weak but
+  statistically significant, suggesting NLP features add marginal predictive value."
+- Keep explanations concise: 1–3 sentences max per cell. No filler text.
+- Results that are surprising, expected, or noteworthy should be explicitly called out.
+
 01_eda.ipynb
 - Dataset overview: shape, dtypes, missing values
 - Distribution plots for all market features
