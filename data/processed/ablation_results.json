@@ -57,7 +57,7 @@
     }
   },
   "B": {
-    "n_features": 46,
+    "n_features": 51,
     "feature_cols": [
       "return_1d",
       "return_5d",
@@ -88,6 +88,11 @@
       "sentiment_dispersion",
       "news_volume_5d",
       "sentiment_momentum",
+      "is_sentiment_imputed",
+      "sentiment_shift_3d",
+      "sentiment_surprise",
+      "news_volume_zscore",
+      "sentiment_x_volume",
       "finbert_embed_pca_1",
       "finbert_embed_pca_2",
       "finbert_embed_pca_3",
@@ -106,33 +111,33 @@
       "sector_Insurance",
       "sector_Technology"
     ],
-    "cv_f1_mean": 0.5005529818299979,
-    "cv_f1_std": 0.024482947575298307,
-    "cv_acc_mean": 0.510761328804573,
+    "cv_f1_mean": 0.499585506555285,
+    "cv_f1_std": 0.02297985217491503,
+    "cv_acc_mean": 0.5094689752298898,
     "fold_f1": [
-      0.4852348513950737,
-      0.4996264327084412,
-      0.529462031109714,
-      0.5245987802463856,
-      0.46384281369037467
+      0.4854186783296055,
+      0.4996576926947942,
+      0.5305108855604274,
+      0.5170704071857193,
+      0.46526986900587863
     ],
-    "test_f1_macro": 0.4971964189129457,
-    "test_accuracy": 0.4979783357460191,
+    "test_f1_macro": 0.49829044838982794,
+    "test_accuracy": 0.49872710028453054,
     "per_class": {
       "DOWN": {
         "precision": 0.4639,
-        "recall": 0.584,
-        "f1": 0.517
+        "recall": 0.574,
+        "f1": 0.5131
       },
       "UP": {
-        "precision": 0.545,
-        "recall": 0.4247,
-        "f1": 0.4774
+        "precision": 0.5448,
+        "recall": 0.4346,
+        "f1": 0.4835
       }
     }
   },
   "C": {
-    "n_features": 56,
+    "n_features": 61,
     "feature_cols": [
       "return_1d",
       "return_5d",
@@ -163,6 +168,11 @@
       "sentiment_dispersion",
       "news_volume_5d",
       "sentiment_momentum",
+      "is_sentiment_imputed",
+      "sentiment_shift_3d",
+      "sentiment_surprise",
+      "news_volume_zscore",
+      "sentiment_x_volume",
       "finbert_embed_pca_1",
       "finbert_embed_pca_2",
       "finbert_embed_pca_3",
@@ -191,28 +201,28 @@
       "sector_Insurance",
       "sector_Technology"
     ],
-    "cv_f1_mean": 0.500410418397958,
-    "cv_f1_std": 0.02409809751211065,
-    "cv_acc_mean": 0.5107116228978544,
+    "cv_f1_mean": 0.4985725966973031,
+    "cv_f1_std": 0.024176663072543268,
+    "cv_acc_mean": 0.5076629939524481,
     "fold_f1": [
-      0.48331167595925084,
-      0.4996686378377245,
-      0.5292041966001084,
-      0.5242732328854867,
-      0.4655943487072198
+      0.4856015814654831,
+      0.4951047452762643,
+      0.5296733497357886,
+      0.5201167263289908,
+      0.46236658067998837
     ],
-    "test_f1_macro": 0.4918558871308899,
-    "test_accuracy": 0.49238756052513355,
+    "test_f1_macro": 0.49521395248062083,
+    "test_accuracy": 0.49578195976638545,
     "per_class": {
       "DOWN": {
-        "precision": 0.4585,
-        "recall": 0.5702,
-        "f1": 0.5083
+        "precision": 0.4616,
+        "recall": 0.5752,
+        "f1": 0.5121
       },
       "UP": {
-        "precision": 0.5377,
-        "recall": 0.4261,
-        "f1": 0.4754
+        "precision": 0.5418,
+        "recall": 0.4281,
+        "f1": 0.4783
       }
     }
   }

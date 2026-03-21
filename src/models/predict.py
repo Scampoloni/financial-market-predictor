@@ -147,6 +147,9 @@ class LivePredictor:
             "vader_sentiment": 0.0, "news_volume_1d": 0.0,
             "news_volume_5d": 0.0, "headline_avg_length": 0.0,
             "sentiment_momentum": 0.0, "sentiment_dispersion": 0.0,
+            "sentiment_shift_3d": 0.0, "sentiment_surprise": 0.0,
+            "sentiment_x_volume": 0.0, "news_volume_zscore": 0.0,
+            "is_sentiment_imputed": 1.0,
         }
         for i in range(n_pca):
             nlp_feat[f"finbert_embed_pca_{i+1}"] = 0.0

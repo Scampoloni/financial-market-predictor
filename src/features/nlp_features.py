@@ -4,6 +4,12 @@ nlp_features.py — Aggregate NLP sentiment outputs into per-ticker-day ML featu
 Takes the raw headline-level FinBERT + VADER scores and produces a flat
 DataFrame (one row per ticker-day) that can be joined with market features.
 
+Coverage strategy (multi-layer fallback):
+  1. Ticker-specific news → direct FinBERT/VADER scores
+  2. Sector-level average sentiment → for tickers with no news on a given day
+  3. Market-wide average sentiment → for days with no sector news
+  4. Forward-fill remaining gaps → carry last known sentiment
+
 Features produced per ticker-day:
   finbert_sentiment      — mean FinBERT compound score
   finbert_confidence     — mean FinBERT confidence
@@ -13,6 +19,11 @@ Features produced per ticker-day:
   headline_avg_length    — mean word count of headlines
   sentiment_momentum     — finbert_sentiment - finbert_sentiment 5 days ago
   sentiment_dispersion   — std of FinBERT scores across headlines
+  sentiment_shift_3d     — finbert change over 3 days
+  sentiment_surprise     — z-score vs 20-day rolling mean
+  sentiment_x_volume     — finbert * volume_ratio interaction
+  news_volume_zscore     — z-score of news_volume_1d vs 20-day rolling
+  is_sentiment_imputed   — 1 if sentiment was imputed (sector/market/ffill)
   finbert_embed_pca_1..10 — 10 PCA dims of mean CLS embeddings
 
 Usage:
@@ -34,6 +45,7 @@ from src.config import (
     NLP_PCA_COMPONENTS,
     PROCESSED_DIR,
     RAW_NEWS_DIR,
+    TICKER_SECTOR_MAP,
     TICKERS_ALL,
 )
 from src.nlp.finbert_sentiment import FinBertPipeline, FINBERT_CACHE_PATH
@@ -181,11 +193,125 @@ def _fill_zero_nlp_features(feat: pd.DataFrame) -> None:
         "finbert_sentiment", "finbert_confidence", "vader_sentiment",
         "news_volume_1d", "news_volume_5d", "headline_avg_length",
         "sentiment_momentum", "sentiment_dispersion",
+        "sentiment_shift_3d", "sentiment_surprise",
+        "sentiment_x_volume", "news_volume_zscore",
+        "is_sentiment_imputed",
     ]
     for col in scalar_cols:
         feat[col] = 0.0
     for i in range(NLP_PCA_COMPONENTS):
         feat[f"finbert_embed_pca_{i+1}"] = 0.0
+
+
+def _apply_sector_and_market_fallback(combined: pd.DataFrame) -> pd.DataFrame:
+    """Apply multi-layer sentiment fallback to fill coverage gaps.
+
+    Layer 1: Ticker-specific sentiment (already computed)
+    Layer 2: Sector average sentiment for that day
+    Layer 3: Market-wide average sentiment for that day
+    Layer 4: Forward-fill remaining gaps
+
+    Args:
+        combined: Full NLP feature DataFrame with all tickers.
+
+    Returns:
+        DataFrame with improved coverage and is_sentiment_imputed flag.
+    """
+    sentiment_cols = ["finbert_sentiment", "finbert_confidence", "vader_sentiment"]
+
+    # Mark which rows originally had ticker-specific news
+    has_news = combined["news_volume_1d"] > 0
+    combined["is_sentiment_imputed"] = 0.0
+
+    # Add sector column for grouping
+    combined["_sector"] = combined["ticker"].map(TICKER_SECTOR_MAP).fillna("Unknown")
+
+    # Compute sector-level daily average (only from rows WITH news)
+    news_rows = combined[has_news]
+    sector_daily = news_rows.groupby([news_rows.index, "_sector"])[sentiment_cols].mean()
+    sector_daily.index.names = ["date", "_sector"]
+
+    # Compute market-wide daily average (only from rows WITH news)
+    market_daily = news_rows.groupby(news_rows.index)[sentiment_cols].mean()
+
+    # Apply fallbacks
+    for col in sentiment_cols:
+        missing = combined[col] == 0  # rows without direct news
+        if not missing.any():
+            continue
+
+        # Layer 2: Sector fallback
+        for idx in combined[missing].index.unique():
+            for sector in combined.loc[[idx], "_sector"].unique():
+                mask = missing & (combined.index == idx) & (combined["_sector"] == sector)
+                if mask.any() and (idx, sector) in sector_daily.index:
+                    combined.loc[mask, col] = sector_daily.loc[(idx, sector), col]
+                    combined.loc[mask, "is_sentiment_imputed"] = 1.0
+
+        # Layer 3: Market-wide fallback (still missing)
+        still_missing = (combined[col] == 0) & missing
+        for idx in combined[still_missing].index.unique():
+            mask = still_missing & (combined.index == idx)
+            if mask.any() and idx in market_daily.index:
+                combined.loc[mask, col] = market_daily.loc[idx, col]
+                combined.loc[mask, "is_sentiment_imputed"] = 1.0
+
+    # Layer 4: Forward-fill remaining gaps per ticker
+    for col in sentiment_cols:
+        combined[col] = combined.groupby("ticker")[col].ffill()
+        still_zero = combined[col] == 0
+        combined.loc[still_zero, col] = 0  # keep 0 for truly unavailable
+        combined.loc[still_zero & ~has_news, "is_sentiment_imputed"] = 1.0
+
+    combined = combined.drop(columns=["_sector"])
+
+    return combined
+
+
+def _add_dynamic_nlp_features(combined: pd.DataFrame) -> pd.DataFrame:
+    """Add dynamic NLP features that capture sentiment CHANGES, not just levels.
+
+    Args:
+        combined: Full NLP feature DataFrame (after fallback).
+
+    Returns:
+        DataFrame with additional dynamic features.
+    """
+    # Sentiment shift over 3 days
+    combined["sentiment_shift_3d"] = combined.groupby("ticker")["finbert_sentiment"].transform(
+        lambda x: x - x.shift(3)
+    ).fillna(0)
+
+    # Sentiment surprise: z-score vs 20-day rolling mean
+    rolling_mean = combined.groupby("ticker")["finbert_sentiment"].transform(
+        lambda x: x.rolling(20, min_periods=5).mean()
+    )
+    rolling_std = combined.groupby("ticker")["finbert_sentiment"].transform(
+        lambda x: x.rolling(20, min_periods=5).std()
+    )
+    combined["sentiment_surprise"] = (
+        (combined["finbert_sentiment"] - rolling_mean) / (rolling_std + 1e-8)
+    ).fillna(0)
+
+    # News volume z-score (unusual number of articles)
+    vol_mean = combined.groupby("ticker")["news_volume_1d"].transform(
+        lambda x: x.rolling(20, min_periods=5).mean()
+    )
+    vol_std = combined.groupby("ticker")["news_volume_1d"].transform(
+        lambda x: x.rolling(20, min_periods=5).std()
+    )
+    combined["news_volume_zscore"] = (
+        (combined["news_volume_1d"] - vol_mean) / (vol_std + 1e-8)
+    ).fillna(0)
+
+    # Sentiment × volume interaction — needs volume_ratio from market features
+    # We'll compute this using news_volume_1d as a proxy since we don't have
+    # market volume here. The actual interaction will be captured via the model.
+    combined["sentiment_x_volume"] = (
+        combined["finbert_sentiment"] * combined["news_volume_1d"]
+    ).fillna(0)
+
+    return combined
 
 
 def build_all_nlp_features(
@@ -198,6 +324,7 @@ def build_all_nlp_features(
     """Build the full NLP feature matrix for all tickers and save to Parquet.
 
     Runs FinBERT + VADER per ticker, aggregates to daily features,
+    applies sector/market fallback for coverage, adds dynamic features,
     fits PCA on CLS embeddings, and saves the result.
 
     Args:
@@ -224,8 +351,21 @@ def build_all_nlp_features(
     combined = pd.concat(all_frames, axis=0)
     combined.index.name = "date"
 
-    # Fit PCA on CLS embeddings across all tickers
-    # Only use rows that actually have news coverage (non-zero embeddings)
+    # --- Multi-layer sentiment fallback ---
+    before_coverage = (combined["news_volume_1d"] > 0).sum()
+    logger.info("Before fallback: %d/%d rows have direct news (%.1f%%)",
+                before_coverage, len(combined), 100 * before_coverage / len(combined))
+
+    combined = _apply_sector_and_market_fallback(combined)
+
+    has_sentiment = (combined["finbert_sentiment"] != 0).sum()
+    logger.info("After fallback: %d/%d rows have sentiment (%.1f%%)",
+                has_sentiment, len(combined), 100 * has_sentiment / len(combined))
+
+    # --- Dynamic NLP features ---
+    combined = _add_dynamic_nlp_features(combined)
+
+    # --- Fit PCA on CLS embeddings ---
     embed_cols = [c for c in combined.columns if c.startswith("embed_")]
     if embed_cols:
         rows_with_news = combined["news_volume_1d"] > 0
@@ -262,13 +402,20 @@ def build_all_nlp_features(
 
         combined = combined.drop(columns=embed_cols)
 
+    # Ensure new dynamic features are present even if no news at all
+    for col in ["sentiment_shift_3d", "sentiment_surprise",
+                "sentiment_x_volume", "news_volume_zscore", "is_sentiment_imputed"]:
+        if col not in combined.columns:
+            combined[col] = 0.0
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     combined.to_parquet(output_path)
 
     covered = combined[combined["news_volume_1d"] > 0]["ticker"].nunique()
+    imputed = (combined["is_sentiment_imputed"] == 1).sum()
     logger.info(
-        "NLP features saved: %d rows x %d cols | %d/%d tickers have news coverage",
-        len(combined), len(combined.columns), covered, len(tickers),
+        "NLP features saved: %d rows x %d cols | %d/%d tickers have news | %d rows imputed",
+        len(combined), len(combined.columns), covered, len(tickers), imputed,
     )
     return combined
 
