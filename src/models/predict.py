@@ -245,9 +245,13 @@ class LivePredictor:
         nlp_feat = self._build_nlp_features(ticker)
         cv_feat  = self._build_cv_features(ticker)
 
-        # Assemble feature vector
+        # Assemble feature vector — reindex to training columns, missing = 0
         all_feat = pd.concat([latest_row, nlp_feat, cv_feat])
-        feature_vec = pd.DataFrame([all_feat])[self._feature_cols].fillna(0)
+        feature_vec = (
+            pd.DataFrame([all_feat])
+            .reindex(columns=self._feature_cols, fill_value=0)
+            .fillna(0)
+        )
 
         # Predict
         proba = self._model.predict_proba(feature_vec)[0]
