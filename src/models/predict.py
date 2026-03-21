@@ -117,7 +117,7 @@ class LivePredictor:
 
     def _build_nlp_features(self, ticker: str, n_pca: int = 10) -> pd.Series:
         """Score recent headlines and return NLP feature Series."""
-        from src.data_collection.news_scraper import scrape_ticker_news
+        from src.data_collection.news_scraper import load_ticker_news, fetch_all_rss, match_headlines_to_ticker
         from src.nlp.finbert_sentiment import FinBertPipeline
         from src.nlp.vader_sentiment import VaderPipeline
 
@@ -127,9 +127,19 @@ class LivePredictor:
             self._vader = VaderPipeline()
 
         try:
-            headlines = scrape_ticker_news(ticker, max_headlines=50)
+            # Try saved parquet first, then live RSS as fallback
+            news_df = load_ticker_news(ticker)
+            headlines = news_df.head(50).to_dict("records")
+        except FileNotFoundError:
+            try:
+                rss_df = fetch_all_rss()
+                matched = match_headlines_to_ticker(rss_df, ticker)
+                headlines = matched.head(50).to_dict("records")
+            except Exception as exc:
+                logger.warning("%s: news fetch failed (%s) — using neutral NLP", ticker, exc)
+                headlines = []
         except Exception as exc:
-            logger.warning("%s: news scraping failed (%s) — using neutral NLP", ticker, exc)
+            logger.warning("%s: news load failed (%s) — using neutral NLP", ticker, exc)
             headlines = []
 
         nlp_feat: dict = {
