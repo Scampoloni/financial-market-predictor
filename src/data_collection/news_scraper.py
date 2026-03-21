@@ -230,8 +230,8 @@ def fetch_newsapi(ticker: str, company_name: str, page_size: int = 100) -> pd.Da
 
         rows = [
             {
-                "title": a.get("title", "").strip(),
-                "summary": a.get("description", "").strip(),
+                "title": (a.get("title") or "").strip(),
+                "summary": (a.get("description") or "").strip(),
                 "published": pd.to_datetime(a.get("publishedAt"), utc=True),
                 "link": a.get("url", ""),
                 "source": a.get("source", {}).get("name", "NewsAPI"),
