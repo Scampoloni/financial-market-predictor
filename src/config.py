@@ -53,7 +53,7 @@ GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 # Data collection constants
 # ---------------------------------------------------------------------------
 DATA_START_DATE = "2020-01-01"
-DATA_END_DATE = "2025-12-31"
+DATA_END_DATE = "2026-03-21"  # extended to include recent period for NLP feature overlap
 
 # Train / validation / test splits (temporal, no leakage)
 TRAIN_START = "2020-01-01"
