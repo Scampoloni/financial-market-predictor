@@ -18,7 +18,7 @@ from sklearn.metrics import (
 )
 
 
-TARGET_CLASSES = ["DOWN", "SIDEWAYS", "UP"]
+from src.config import TARGET_CLASSES
 
 
 def plot_confusion_matrices(

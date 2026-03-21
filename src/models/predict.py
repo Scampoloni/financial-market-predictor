@@ -221,7 +221,7 @@ class LivePredictor:
     # Public API
     # ------------------------------------------------------------------
     def predict(self, ticker: str) -> dict:
-        """Generate a live UP/DOWN/SIDEWAYS prediction for a ticker.
+        """Generate a live UP/DOWN prediction for a ticker.
 
         Args:
             ticker: Stock ticker symbol (e.g., 'AAPL').
@@ -263,9 +263,9 @@ class LivePredictor:
         prob_dict = {cls: round(float(p), 4) for cls, p in zip(classes, proba)}
 
         logger.info(
-            "%s: %s (conf=%.2f) | DOWN=%.2f SIDEWAYS=%.2f UP=%.2f",
+            "%s: %s (conf=%.2f) | DOWN=%.2f UP=%.2f",
             ticker, prediction, confidence,
-            prob_dict.get("DOWN", 0), prob_dict.get("SIDEWAYS", 0), prob_dict.get("UP", 0),
+            prob_dict.get("DOWN", 0), prob_dict.get("UP", 0),
         )
 
         return {

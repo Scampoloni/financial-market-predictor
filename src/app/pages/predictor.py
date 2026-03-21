@@ -16,9 +16,9 @@ from src.config import TICKER_SECTOR_MAP
 
 
 # ── Colour palette ───────────────────────────────────────────────────────────
-_PRED_COLOR  = {"UP": "#3fb950", "DOWN": "#f85149", "SIDEWAYS": "#d29922"}
-_PRED_ICON   = {"UP": "▲", "DOWN": "▼", "SIDEWAYS": "◆"}
-_PRED_LABEL  = {"UP": "Bullish", "DOWN": "Bearish", "SIDEWAYS": "Neutral"}
+_PRED_COLOR  = {"UP": "#3fb950", "DOWN": "#f85149"}
+_PRED_ICON   = {"UP": "▲", "DOWN": "▼"}
+_PRED_LABEL  = {"UP": "Bullish", "DOWN": "Bearish"}
 
 
 def _price_chart(ticker: str) -> None:
@@ -54,8 +54,8 @@ def _price_chart(ticker: str) -> None:
 
 
 def _prob_gauge(probs: dict, prediction: str) -> None:
-    """Horizontal stacked bar showing DOWN / SIDEWAYS / UP probabilities."""
-    order  = ["DOWN", "SIDEWAYS", "UP"]
+    """Horizontal stacked bar showing DOWN / UP probabilities."""
+    order  = ["DOWN", "UP"]
     colors = [_PRED_COLOR[c] for c in order]
     vals   = [probs.get(c, 0) for c in order]
 
@@ -110,7 +110,7 @@ def render() -> None:
     if not run:
         st.markdown(
             "<p style='color:#8b949e;text-align:center;margin-top:1rem'>"
-            "Click <b>Predict</b> to generate a next-day forecast</p>",
+            "Click <b>Predict</b> to generate a 5-day forecast</p>",
             unsafe_allow_html=True,
         )
         return

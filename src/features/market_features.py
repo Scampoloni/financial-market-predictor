@@ -32,9 +32,7 @@ from src.config import (
     RSI_PERIOD,
     SMA_LONG,
     SMA_SHORT,
-    TARGET_DOWN_THRESHOLD,
     TARGET_HORIZON_DAYS,
-    TARGET_UP_THRESHOLD,
     TICKER_SECTOR_MAP,
     TICKERS_ALL,
     VOLATILITY_PERIOD,
@@ -273,12 +271,11 @@ def compute_cyclical_time_features(index: pd.DatetimeIndex) -> pd.DataFrame:
 
 
 def compute_target(close: pd.Series, horizon: int = TARGET_HORIZON_DAYS) -> pd.Series:
-    """Compute the classification target: forward return direction.
+    """Compute the classification target: 5-day forward return direction (binary).
 
     Target classes:
-      UP      →  forward return > TARGET_UP_THRESHOLD (+1%)
-      DOWN    →  forward return < TARGET_DOWN_THRESHOLD (-1%)
-      SIDEWAYS → otherwise
+      UP   →  forward return > 0%
+      DOWN →  forward return <= 0%
 
     IMPORTANT: The target uses FUTURE close prices. Rows near the end of the
     series will be NaN — these must be dropped before training to prevent leakage.
@@ -288,12 +285,11 @@ def compute_target(close: pd.Series, horizon: int = TARGET_HORIZON_DAYS) -> pd.S
         horizon: Number of trading days ahead to predict (default 5).
 
     Returns:
-        Series of string labels ['DOWN', 'SIDEWAYS', 'UP'].
+        Series of string labels ['DOWN', 'UP'].
     """
     fwd_return = close.shift(-horizon) / close - 1
-    target = pd.Series("SIDEWAYS", index=close.index, name="target")
-    target[fwd_return > TARGET_UP_THRESHOLD] = "UP"
-    target[fwd_return < TARGET_DOWN_THRESHOLD] = "DOWN"
+    target = pd.Series("DOWN", index=close.index, name="target")
+    target[fwd_return > 0] = "UP"
     target[fwd_return.isna()] = np.nan
     return target
 

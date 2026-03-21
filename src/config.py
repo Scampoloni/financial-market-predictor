@@ -63,12 +63,9 @@ VAL_END = "2024-12-31"
 TEST_START = "2025-01-01"
 TEST_END = "2025-12-31"
 
-# Target definition: classification thresholds for 5-day forward return
+# Target definition: 5-day forward return, binary classification
 TARGET_HORIZON_DAYS = 5          # predict 5-trading-day forward return
-TARGET_UP_THRESHOLD = 0.01       # > +1% → UP
-TARGET_DOWN_THRESHOLD = -0.01    # < -1% → DOWN
-# otherwise → SIDEWAYS
-TARGET_CLASSES = ["DOWN", "SIDEWAYS", "UP"]
+TARGET_CLASSES = ["DOWN", "UP"]  # binary: return <= 0 → DOWN, > 0 → UP
 
 # ---------------------------------------------------------------------------
 # Ticker universe — ~80 S&P 500 tickers across sectors
