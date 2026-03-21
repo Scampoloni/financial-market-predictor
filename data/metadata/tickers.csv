@@ -1,0 +1,68 @@
+ticker,sector,subsector
+AAPL,Technology,Consumer Electronics
+MSFT,Technology,Software
+NVDA,Technology,Semiconductors
+GOOGL,Technology,Internet
+META,Technology,Social Media
+AMZN,Technology,E-Commerce
+TSLA,Technology,Electric Vehicles
+AMD,Technology,Semiconductors
+INTC,Technology,Semiconductors
+QCOM,Technology,Semiconductors
+CRM,Technology,Software
+ORCL,Technology,Software
+ADBE,Technology,Software
+NOW,Technology,Software
+INTU,Technology,Software
+JPM,Finance,Banking
+GS,Finance,Investment Banking
+BAC,Finance,Banking
+MS,Finance,Investment Banking
+V,Finance,Payments
+MA,Finance,Payments
+BRK-B,Finance,Diversified
+C,Finance,Banking
+WFC,Finance,Banking
+AXP,Finance,Payments
+BLK,Finance,Asset Management
+SCHW,Finance,Brokerage
+AIG,Insurance,Property & Casualty
+MET,Insurance,Life
+PRU,Insurance,Life
+ALL,Insurance,Property & Casualty
+TRV,Insurance,Property & Casualty
+JNJ,Healthcare,Pharmaceuticals
+PFE,Healthcare,Pharmaceuticals
+UNH,Healthcare,Managed Care
+ABBV,Healthcare,Biotechnology
+MRK,Healthcare,Pharmaceuticals
+LLY,Healthcare,Pharmaceuticals
+TMO,Healthcare,Life Sciences Tools
+ABT,Healthcare,Medical Devices
+AMGN,Healthcare,Biotechnology
+GILD,Healthcare,Biotechnology
+KO,Consumer,Beverages
+PEP,Consumer,Beverages
+MCD,Consumer,Restaurants
+NKE,Consumer,Apparel
+SBUX,Consumer,Restaurants
+PG,Consumer,Household Products
+WMT,Consumer,Retail
+COST,Consumer,Retail
+TGT,Consumer,Retail
+HD,Consumer,Home Improvement
+XOM,Energy,Integrated Oil & Gas
+CVX,Energy,Integrated Oil & Gas
+COP,Energy,Exploration & Production
+SLB,Energy,Oil Services
+EOG,Energy,Exploration & Production
+PSX,Energy,Refining
+BA,Industrial,Aerospace & Defense
+CAT,Industrial,Machinery
+GE,Industrial,Conglomerates
+MMM,Industrial,Conglomerates
+HON,Industrial,Conglomerates
+UPS,Industrial,Logistics
+FDX,Industrial,Logistics
+RTX,Industrial,Aerospace & Defense
+LMT,Industrial,Aerospace & Defense
