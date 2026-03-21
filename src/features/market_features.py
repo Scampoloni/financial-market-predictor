@@ -306,28 +306,35 @@ def build_ticker_features(
     ticker: str,
     data_dir: Path = RAW_MARKET_DIR,
     vix_df: pd.DataFrame | None = None,
+    raw_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame | None:
     """Build the full feature matrix for a single ticker.
 
-    Reads raw OHLCV CSV, computes all technical indicators, adds VIX,
-    sector encoding, time features, and the classification target.
+    Reads raw OHLCV CSV (or accepts a pre-loaded DataFrame for live use),
+    computes all technical indicators, adds VIX, sector encoding, time
+    features, and the classification target.
 
     Args:
         ticker: Ticker symbol.
         data_dir: Directory containing raw CSV files.
         vix_df: Pre-loaded VIX DataFrame to avoid repeated disk reads.
+        raw_df: Optional pre-loaded OHLCV DataFrame (used by LivePredictor).
+                If provided, skips CSV loading.
 
     Returns:
         Feature DataFrame with DatetimeIndex, or None on failure.
     """
-    csv_path = data_dir / f"{ticker}.csv"
-    if not csv_path.exists():
-        logger.warning("%s: CSV not found at %s — skipping", ticker, csv_path)
-        return None
-
-    try:
+    if raw_df is not None:
+        df = raw_df.sort_index()
+    else:
+        csv_path = data_dir / f"{ticker}.csv"
+        if not csv_path.exists():
+            logger.warning("%s: CSV not found at %s — skipping", ticker, csv_path)
+            return None
         df = pd.read_csv(csv_path, index_col="Date", parse_dates=True)
         df = df.sort_index()
+
+    try:
 
         # Require minimum 60 rows to compute SMA-50 + some margin
         if len(df) < 60:
