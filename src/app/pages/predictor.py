@@ -10,7 +10,11 @@ from datetime import datetime, timedelta
 from html import escape as html_escape
 
 from src.app.utils import get_predictor, TICKERS_SORTED
-from src.config import COMPANY_KEYWORDS, SPAM_KEYWORDS, TICKER_SECTOR_MAP
+from src.config import (
+    COMPANY_KEYWORDS, SPAM_KEYWORDS, TICKER_SECTOR_MAP,
+    FEATURES_MARKET_PATH, FEATURES_NLP_PATH, FEATURES_CV_PATH,
+    STACKING_MODEL_PATH, MODEL_21D_PATH, TEST_START,
+)
 
 # ── Palette ──────────────────────────────────────────────────────────────────
 _UP_COLOR = "#10b981"
@@ -450,6 +454,179 @@ def _render_headline(title: str, source: str, date_str: str, sentiment: float | 
     )
 
 
+# ── Backtest ─────────────────────────────────────────────────────────────────
+
+_MODEL_PATHS = {5: STACKING_MODEL_PATH, 21: MODEL_21D_PATH}
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _compute_backtest(ticker: str, horizon: int) -> pd.DataFrame | None:
+    """Run model predictions on held-out test set features for a ticker.
+
+    Returns DataFrame with columns: date, actual, predicted, confidence, correct.
+    Uses pre-saved feature parquets — no live data fetching.
+    """
+    import joblib
+
+    model_path = _MODEL_PATHS.get(horizon)
+    if model_path is None or not model_path.exists():
+        return None
+
+    try:
+        artifact = joblib.load(model_path)
+        model = artifact["model"]
+        feature_cols = artifact["feature_cols"]
+
+        # Load features
+        mkt = pd.read_parquet(FEATURES_MARKET_PATH)
+        nlp = pd.read_parquet(FEATURES_NLP_PATH)
+        cv = pd.read_parquet(FEATURES_CV_PATH)
+
+        # Filter to ticker
+        t_mkt = mkt[mkt["ticker"] == ticker].copy()
+        t_nlp = nlp[nlp["ticker"] == ticker].drop(columns=["ticker"])
+        t_cv = cv[cv["ticker"] == ticker].drop(columns=["ticker"])
+
+        # Join features
+        combined = t_mkt.join(t_nlp, how="inner").join(t_cv, how="inner")
+
+        # One-hot encode sector dummies (model expects sector_*)
+        if "sector" in combined.columns:
+            dummies = pd.get_dummies(combined["sector"], prefix="sector")
+            # Ensure all expected sector columns exist
+            for col in feature_cols:
+                if col.startswith("sector_") and col not in dummies.columns:
+                    dummies[col] = 0
+            combined = pd.concat([combined, dummies], axis=1)
+
+        # Build target column
+        if horizon == 5:
+            # Already stored in features_market as 'target'
+            if "target" not in combined.columns:
+                return None
+            combined["actual"] = combined["target"]
+        else:
+            # Compute forward return for the given horizon
+            combined["fwd_return"] = combined["close"].shift(-horizon) / combined["close"] - 1
+            combined["actual"] = np.where(combined["fwd_return"] > 0, "UP", "DOWN")
+            combined = combined.dropna(subset=["fwd_return"])
+
+        # Filter to test period, last 6 months
+        combined = combined[combined.index >= TEST_START]
+        # Drop rows where actual outcome isn't yet known
+        if horizon == 5:
+            combined = combined[combined["actual"].notna()]
+        combined = combined.tail(130)  # ~6 months of trading days
+
+        if len(combined) < 10:
+            return None
+
+        # Run predictions
+        X = combined[feature_cols].fillna(0)
+        proba = model.predict_proba(X)
+        up_idx = list(model.classes_).index("UP")
+        preds = model.predict(X)
+
+        result = pd.DataFrame({
+            "date": combined.index,
+            "actual": combined["actual"].values,
+            "predicted": preds,
+            "confidence": np.max(proba, axis=1),
+            "up_prob": proba[:, up_idx],
+        })
+        result["correct"] = result["actual"] == result["predicted"]
+        return result.reset_index(drop=True)
+
+    except Exception:
+        return None
+
+
+def _render_backtest(ticker: str, horizon: int) -> None:
+    """Render the backtest expander with chart and metrics."""
+    import plotly.graph_objects as go
+
+    with st.expander("Historical Prediction Accuracy", expanded=False):
+        bt = _compute_backtest(ticker, horizon)
+        if bt is None or len(bt) < 10:
+            st.markdown(
+                f'<p style="color:{_MUTED};text-align:center;font-size:0.9rem">'
+                f'Insufficient test data for {html_escape(ticker)} ({horizon}D horizon).</p>',
+                unsafe_allow_html=True,
+            )
+            return
+
+        # ── Scatter: confidence dots colored by correctness ──────────────
+        correct = bt[bt["correct"]]
+        wrong = bt[~bt["correct"]]
+
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=correct["date"], y=correct["confidence"],
+            mode="markers", name="Correct",
+            marker=dict(color=_UP_COLOR, size=7, opacity=0.8),
+        ))
+        fig.add_trace(go.Scatter(
+            x=wrong["date"], y=wrong["confidence"],
+            mode="markers", name="Wrong",
+            marker=dict(color=_DOWN_COLOR, size=7, opacity=0.8),
+        ))
+
+        # ── Rolling 30-day accuracy line ─────────────────────────────────
+        bt["rolling_acc"] = bt["correct"].rolling(30, min_periods=10).mean()
+        fig.add_trace(go.Scatter(
+            x=bt["date"], y=bt["rolling_acc"],
+            mode="lines", name="30D Rolling Acc",
+            line=dict(color="#60a5fa", width=2),
+        ))
+
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(10,14,23,0.6)",
+            height=320,
+            margin=dict(l=0, r=0, t=10, b=0),
+            yaxis=dict(
+                title="Confidence / Accuracy",
+                range=[0.35, 1.0],
+                gridcolor="#1e293b",
+                tickformat=".0%",
+            ),
+            xaxis=dict(gridcolor="#1e293b"),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02,
+                font=dict(size=11, color="#94a3b8"),
+                bgcolor="rgba(0,0,0,0)",
+            ),
+            font=dict(family="Inter, sans-serif"),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+        # ── Metric cards ─────────────────────────────────────────────────
+        overall_acc = bt["correct"].mean()
+        up_mask = bt["predicted"] == "UP"
+        tp = ((bt["predicted"] == "UP") & (bt["actual"] == "UP")).sum()
+        fp = ((bt["predicted"] == "UP") & (bt["actual"] == "DOWN")).sum()
+        fn = ((bt["predicted"] == "DOWN") & (bt["actual"] == "UP")).sum()
+        precision_up = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall_up = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("Overall Accuracy", f"{overall_acc:.1%}")
+        with c2:
+            st.metric("Precision (UP)", f"{precision_up:.1%}")
+        with c3:
+            st.metric("Recall (UP)", f"{recall_up:.1%}")
+
+        st.markdown(
+            f'<p style="color:{_MUTED};font-size:0.78rem;margin-top:0.5rem">'
+            f'Historical performance shown on the held-out test set (2025). '
+            f'Not representative of future performance.</p>',
+            unsafe_allow_html=True,
+        )
+
+
 # ── Main render ──────────────────────────────────────────────────────────────
 
 def render() -> None:
@@ -651,6 +828,9 @@ def render() -> None:
             f"Select a ticker and click <b style='color:#60a5fa'>Predict</b> to generate a forecast</p>",
             unsafe_allow_html=True,
         )
+
+    # ── Backtest ──────────────────────────────────────────────────────────────
+    _render_backtest(ticker, selected_horizon)
 
     # ── Disclaimer ───────────────────────────────────────────────────────────
     st.markdown(
