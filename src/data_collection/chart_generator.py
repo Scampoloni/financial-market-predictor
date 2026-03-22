@@ -151,7 +151,7 @@ def generate_charts_for_ticker(
 def generate_all_charts(
     tickers: list[str] = TICKERS_ALL,
     output_dir: Path = RAW_CHARTS_DIR,
-    step: int = 5,
+    step: int = 2,
     force: bool = False,
 ) -> dict[str, int]:
     """Generate charts for all tickers.
@@ -159,7 +159,7 @@ def generate_all_charts(
     Args:
         tickers: List of ticker symbols.
         output_dir: Root directory for chart images.
-        step: Generate one chart every N trading days.
+        step: Generate one chart every N trading days (default 2 for ~50% coverage).
         force: If True, regenerate existing charts.
 
     Returns:
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     parser.add_argument("--test", action="store_true", help="3-ticker smoke test (5 charts each)")
     parser.add_argument("--ticker", type=str, help="Single ticker")
     parser.add_argument("--force", action="store_true", help="Regenerate existing charts")
-    parser.add_argument("--step", type=int, default=5, help="Chart every N trading days")
+    parser.add_argument("--step", type=int, default=2, help="Chart every N trading days")
     args = parser.parse_args()
 
     if args.ticker:

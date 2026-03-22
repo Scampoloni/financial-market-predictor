@@ -91,11 +91,14 @@ class ChartCNN:
 
         return embedding.squeeze(0).cpu().numpy()
 
-    def embed_batch(self, image_paths: list[str | Path]) -> np.ndarray:
-        """Extract embeddings for a batch of chart images.
+    def embed_batch(
+        self, image_paths: list[str | Path], batch_size: int = 16,
+    ) -> np.ndarray:
+        """Extract embeddings for a batch of chart images in mini-batches.
 
         Args:
             image_paths: List of paths to PNG chart images.
+            batch_size: Number of images per mini-batch (lower = less RAM/CPU).
 
         Returns:
             2-D numpy array of shape (N, 1280). Rows with failed images
@@ -116,11 +119,13 @@ class ChartCNN:
         if not tensors:
             return results
 
-        batch = torch.stack(tensors).to(self.device)  # (N, 3, 224, 224)
-        with torch.no_grad():
-            embeddings = self._model(batch).cpu().numpy()  # (N, 1280)
-
-        for out_idx, emb in zip(valid_indices, embeddings):
-            results[out_idx] = emb
+        # Process in mini-batches to limit RAM/CPU usage
+        for start in range(0, len(tensors), batch_size):
+            end = min(start + batch_size, len(tensors))
+            batch = torch.stack(tensors[start:end]).to(self.device)
+            with torch.no_grad():
+                embeddings = self._model(batch).cpu().numpy()
+            for j, emb in enumerate(embeddings):
+                results[valid_indices[start + j]] = emb
 
         return results
