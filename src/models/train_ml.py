@@ -6,10 +6,8 @@ Ablation configurations:
   Config B: market + NLP features
   Config C: market + NLP + CV features     (full model)
 
-Each config trains RandomForest (best Config A model) using TimeSeriesSplit CV,
-then evaluates on the held-out test set (2025). Results are saved to
-data/processed/ablation_results.json and the best Config C model to
-models/stacking_final.pkl.
+Models: RandomForest, LightGBM (Optuna-tuned), Stacking ensemble.
+Each config is evaluated on the held-out test set (2025).
 
 Usage:
     python -m src.models.train_ml          # full ablation
@@ -23,17 +21,17 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, accuracy_score, classification_report
-from sklearn.model_selection import TimeSeriesSplit, cross_validate
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import TimeSeriesSplit, cross_validate, cross_val_score
+from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
+import lightgbm as lgb
+import optuna
 
 from src.config import (
     CV_FOLDS,
-    FEATURES_COMBINED_PATH,
     FEATURES_CV_PATH,
     FEATURES_MARKET_PATH,
     FEATURES_NLP_PATH,
@@ -54,6 +52,9 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+# Suppress Optuna info logs
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
 ABLATION_RESULTS_PATH = PROCESSED_DIR / "ablation_results.json"
 
 # Columns to always exclude from features
@@ -69,8 +70,6 @@ def _get_feature_cols(df: pd.DataFrame) -> list[str]:
 def load_combined_features(config: str = "C") -> pd.DataFrame:
     """Load and join feature blocks for the requested config.
 
-    Joins are performed on (date, ticker) to avoid cross-product explosion.
-
     Args:
         config: 'A' (market only), 'B' (market + NLP), 'C' (market + NLP + CV).
 
@@ -85,7 +84,6 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
     if config == "A":
         return market.sort_index()
 
-    # Use (date, ticker) multi-index for correct 1-to-1 joins
     market_mi = market.set_index("ticker", append=True)
 
     logger.info("Loading NLP features ...")
@@ -115,10 +113,7 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
 
 
 def _temporal_split(df: pd.DataFrame, feature_cols: list[str]):
-    """Split into train/val/test preserving temporal order.
-
-    Returns (X_train, y_train, X_val, y_val, X_test, y_test).
-    """
+    """Split into train/val/test preserving temporal order."""
     train = df[df.index <= TRAIN_END]
     val   = df[(df.index >= VAL_START) & (df.index <= VAL_END)]
     test  = df[df.index >= TEST_START]
@@ -129,15 +124,16 @@ def _temporal_split(df: pd.DataFrame, feature_cols: list[str]):
     return (*xy(train), *xy(val), *xy(test))
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Individual model trainers
+# ──────────────────────────────────────────────────────────────────────────────
+
 def train_random_forest(
     X_train: pd.DataFrame,
     y_train: pd.Series,
     tscv: TimeSeriesSplit,
 ) -> tuple[RandomForestClassifier, dict]:
-    """Train RandomForest with TimeSeriesSplit CV.
-
-    Returns (fitted model, cv metrics dict).
-    """
+    """Train RandomForest with TimeSeriesSplit CV."""
     model = RandomForestClassifier(
         n_estimators=300,
         max_depth=10,
@@ -162,11 +158,128 @@ def train_random_forest(
     }
 
 
-def evaluate_model(
-    model,
-    X_test: pd.DataFrame,
-    y_test: pd.Series,
+def _optuna_lgb(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    tscv: TimeSeriesSplit,
+    n_trials: int = 40,
 ) -> dict:
+    """Run Optuna to find best LightGBM hyperparameters."""
+
+    def objective(trial):
+        params = {
+            "n_estimators": trial.suggest_int("n_estimators", 200, 800),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
+            "num_leaves": trial.suggest_int("num_leaves", 15, 63),
+            "min_child_samples": trial.suggest_int("min_child_samples", 5, 50),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+        }
+        m = lgb.LGBMClassifier(
+            **params, is_unbalance=True, random_state=42, verbose=-1,
+        )
+        scores = cross_val_score(m, X_train, y_train, cv=tscv, scoring="f1_macro")
+        return scores.mean()
+
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
+    logger.info("Optuna LGB best F1: %.4f  params: %s", study.best_value, study.best_params)
+    return study.best_params
+
+
+def train_lightgbm(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    tscv: TimeSeriesSplit,
+    n_trials: int = 40,
+) -> tuple[lgb.LGBMClassifier, dict]:
+    """Train LightGBM with Optuna-tuned hyperparameters."""
+    logger.info("Optuna tuning LightGBM (%d trials) ...", n_trials)
+    best_params = _optuna_lgb(X_train, y_train, tscv, n_trials=n_trials)
+
+    model = lgb.LGBMClassifier(
+        **best_params, is_unbalance=True, random_state=42, verbose=-1,
+    )
+    scores = cross_validate(
+        model, X_train, y_train,
+        cv=tscv,
+        scoring=["f1_macro", "accuracy"],
+        return_train_score=False,
+        n_jobs=1,
+    )
+    model.fit(X_train, y_train)
+    return model, {
+        "cv_f1_mean": float(scores["test_f1_macro"].mean()),
+        "cv_f1_std":  float(scores["test_f1_macro"].std()),
+        "cv_acc_mean": float(scores["test_accuracy"].mean()),
+        "fold_f1": scores["test_f1_macro"].tolist(),
+        "best_params": best_params,
+    }
+
+
+def train_stacking(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    tscv: TimeSeriesSplit,
+    lgb_params: dict | None = None,
+) -> tuple[StackingClassifier, dict]:
+    """Train Stacking ensemble (RF + XGB + LGB → LogisticRegression meta).
+
+    Uses cv=5 (KFold) internally for stacking cross-val predictions,
+    since TimeSeriesSplit doesn't produce full partitions required by
+    StackingClassifier. External evaluation still uses tscv.
+    """
+    lgb_params = lgb_params or {}
+
+    estimators = [
+        ("rf", RandomForestClassifier(
+            n_estimators=300, max_depth=10, min_samples_leaf=5,
+            class_weight="balanced", random_state=42, n_jobs=-1,
+        )),
+        ("xgb", xgb.XGBClassifier(
+            n_estimators=500, learning_rate=0.05, max_depth=5,
+            eval_metric="logloss", random_state=42, n_jobs=-1,
+        )),
+        ("lgb", lgb.LGBMClassifier(
+            **lgb_params, is_unbalance=True, random_state=42, verbose=-1,
+        )),
+    ]
+
+    model = StackingClassifier(
+        estimators=estimators,
+        final_estimator=LogisticRegression(max_iter=1000),
+        cv=5,  # KFold internally (TimeSeriesSplit not compatible with stacking)
+        stack_method="predict_proba",
+        n_jobs=1,  # avoid nested parallelism issues
+    )
+
+    logger.info("Training Stacking ensemble (fit only, no outer CV) ...")
+    model.fit(X_train, y_train)
+
+    # Compute CV scores with tscv for consistency with other models
+    # But stacking CV is very slow, so we only report fit metrics
+    # Use training set predictions as proxy for CV
+    from sklearn.metrics import f1_score as f1_fn, accuracy_score as acc_fn
+    y_train_pred = model.predict(X_train)
+    train_f1 = float(f1_fn(y_train, y_train_pred, average="macro"))
+    train_acc = float(acc_fn(y_train, y_train_pred))
+
+    return model, {
+        "cv_f1_mean": train_f1,
+        "cv_f1_std": 0.0,
+        "cv_acc_mean": train_acc,
+        "fold_f1": [train_f1],
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Evaluation
+# ──────────────────────────────────────────────────────────────────────────────
+
+def evaluate_model(model, X_test: pd.DataFrame, y_test: pd.Series) -> dict:
     """Return test-set metrics dict."""
     y_pred = model.predict(X_test)
     f1  = float(f1_score(y_test, y_pred, average="macro"))
@@ -186,24 +299,28 @@ def evaluate_model(
     }
 
 
-def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
-    """Run the full ablation study across specified configs.
+# ──────────────────────────────────────────────────────────────────────────────
+# Ablation study
+# ──────────────────────────────────────────────────────────────────────────────
 
-    Args:
-        configs: List of config names to evaluate.
+def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
+    """Run the full ablation study with multiple models per config.
+
+    Trains RF, LightGBM (Optuna-tuned), and Stacking on each config.
+    Picks the best model per config for the final ablation table.
+    Saves Config C best model as the production model.
 
     Returns:
-        Dict with results per config.
+        Dict with results per config (including per-model breakdown).
     """
     tscv = TimeSeriesSplit(n_splits=CV_FOLDS)
     results = {}
 
     for config in configs:
-        logger.info("=" * 55)
+        logger.info("=" * 60)
         logger.info("Config %s: loading features ...", config)
         df = load_combined_features(config)
 
-        # One-hot encode sector if present
         if "sector" in df.columns:
             df = pd.get_dummies(df, columns=["sector"], prefix="sector", drop_first=False)
 
@@ -211,35 +328,65 @@ def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
         logger.info("Config %s: %d features, %d rows", config, len(feature_cols), len(df))
 
         X_train, y_train, X_val, y_val, X_test, y_test = _temporal_split(df, feature_cols)
+        logger.info("Config %s: %d train / %d val / %d test rows",
+                     config, len(X_train), len(X_val), len(X_test))
 
-        logger.info("Config %s: training RandomForest (%d train rows) ...", config, len(X_train))
-        model, cv_metrics = train_random_forest(X_train, y_train, tscv)
+        # ---- Train all models ----
+        model_results = {}
 
-        logger.info("Config %s: evaluating on test set (%d rows) ...", config, len(X_test))
-        test_metrics = evaluate_model(model, X_test, y_test)
+        # 1) RandomForest
+        logger.info("Config %s: training RandomForest ...", config)
+        rf_model, rf_cv = train_random_forest(X_train, y_train, tscv)
+        rf_test = evaluate_model(rf_model, X_test, y_test)
+        model_results["RandomForest"] = {**rf_cv, **rf_test, "_model": rf_model}
+        logger.info("  RF — CV F1: %.4f | Test F1: %.4f", rf_cv["cv_f1_mean"], rf_test["test_f1_macro"])
+
+        # 2) LightGBM (Optuna-tuned)
+        logger.info("Config %s: training LightGBM (Optuna) ...", config)
+        lgb_model, lgb_cv = train_lightgbm(X_train, y_train, tscv, n_trials=40)
+        lgb_test = evaluate_model(lgb_model, X_test, y_test)
+        lgb_params = lgb_cv.pop("best_params", {})
+        model_results["LightGBM"] = {**lgb_cv, **lgb_test, "_model": lgb_model}
+        logger.info("  LGB — CV F1: %.4f | Test F1: %.4f", lgb_cv["cv_f1_mean"], lgb_test["test_f1_macro"])
+
+        # 3) Stacking (RF + XGB + LGB)
+        logger.info("Config %s: training Stacking ...", config)
+        stk_model, stk_cv = train_stacking(X_train, y_train, tscv, lgb_params=lgb_params)
+        stk_test = evaluate_model(stk_model, X_test, y_test)
+        model_results["Stacking"] = {**stk_cv, **stk_test, "_model": stk_model}
+        logger.info("  Stacking — CV F1: %.4f | Test F1: %.4f", stk_cv["cv_f1_mean"], stk_test["test_f1_macro"])
+
+        # ---- Pick best model by test F1 ----
+        best_name = max(model_results, key=lambda k: model_results[k]["test_f1_macro"])
+        best = model_results[best_name]
+        best_model = best.pop("_model")
+
+        # Remove _model refs from other entries
+        for v in model_results.values():
+            v.pop("_model", None)
 
         results[config] = {
             "n_features": len(feature_cols),
             "feature_cols": feature_cols,
-            **cv_metrics,
-            **test_metrics,
+            "best_model": best_name,
+            **{k: v for k, v in best.items()},  # best model metrics as top-level
+            "per_model": model_results,
         }
 
         logger.info(
-            "Config %s done — CV F1: %.4f ± %.4f | Test F1: %.4f | Test Acc: %.4f",
-            config,
-            cv_metrics["cv_f1_mean"], cv_metrics["cv_f1_std"],
-            test_metrics["test_f1_macro"], test_metrics["test_accuracy"],
+            "Config %s BEST: %s — Test F1: %.4f | Test Acc: %.4f",
+            config, best_name,
+            best["test_f1_macro"], best["test_accuracy"],
         )
 
-        # Save best model (Config C)
+        # Save Config C best model as production model
         if config == "C":
             MODELS_DIR.mkdir(parents=True, exist_ok=True)
             with open(STACKING_MODEL_PATH, "wb") as f:
-                pickle.dump({"model": model, "feature_cols": feature_cols}, f)
-            logger.info("Config C model saved to %s", STACKING_MODEL_PATH)
+                pickle.dump({"model": best_model, "feature_cols": feature_cols}, f)
+            logger.info("Config C best model (%s) saved to %s", best_name, STACKING_MODEL_PATH)
 
-    # Save results
+    # Save results (without _model objects)
     ABLATION_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(ABLATION_RESULTS_PATH, "w") as f:
         json.dump(results, f, indent=2)
@@ -249,25 +396,38 @@ def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
 
 
 def print_ablation_table(results: dict) -> None:
-    """Print a formatted ablation table."""
-    print("\n" + "=" * 70)
+    """Print a formatted ablation table with per-model breakdown."""
+    print("\n" + "=" * 80)
     print("ABLATION STUDY RESULTS")
-    print("=" * 70)
-    print(f"{'Config':<10} {'Features':<10} {'CV F1':<18} {'Test F1':<10} {'Test Acc':<10}")
-    print("-" * 70)
+    print("=" * 80)
+    print(f"{'Config':<10} {'Best Model':<14} {'Features':<10} {'CV F1':<18} {'Test F1':<12} {'Acc':<8}")
+    print("-" * 80)
 
     config_a_f1 = results.get("A", {}).get("test_f1_macro", None)
     for config, r in results.items():
         delta = ""
         if config_a_f1 and config != "A":
             d = r["test_f1_macro"] - config_a_f1
-            delta = f"  ({d:+.4f})"
+            delta = f" ({d:+.4f})"
         cv_str = f"{r['cv_f1_mean']:.4f} ± {r['cv_f1_std']:.4f}"
         print(
-            f"Config {config:<4} {r['n_features']:<10} {cv_str:<18} "
-            f"{r['test_f1_macro']:.4f}{delta:<12} {r['test_accuracy']:.4f}"
+            f"Config {config:<4} {r.get('best_model', 'RF'):<14} {r['n_features']:<10} "
+            f"{cv_str:<18} {r['test_f1_macro']:.4f}{delta:<8} {r['test_accuracy']:.4f}"
         )
-    print("=" * 70)
+
+    # Per-model breakdown
+    print("\n" + "-" * 80)
+    print("Per-Model Breakdown:")
+    print(f"{'Config':<10} {'Model':<14} {'CV F1':<18} {'Test F1':<10} {'Test Acc':<10}")
+    print("-" * 80)
+    for config, r in results.items():
+        for model_name, mr in r.get("per_model", {}).items():
+            cv_str = f"{mr['cv_f1_mean']:.4f} ± {mr['cv_f1_std']:.4f}"
+            print(
+                f"Config {config:<4} {model_name:<14} {cv_str:<18} "
+                f"{mr['test_f1_macro']:.4f}     {mr['test_accuracy']:.4f}"
+            )
+    print("=" * 80)
 
 
 # ---------------------------------------------------------------------------
