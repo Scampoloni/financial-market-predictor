@@ -70,8 +70,8 @@ def load_ablation_results() -> dict:
 
 def prediction_badge(prediction: str) -> str:
     """Return coloured HTML badge for a prediction label."""
-    colors = {"UP": "#22c55e", "DOWN": "#ef4444", "SIDEWAYS": "#f59e0b"}
-    icons  = {"UP": "▲", "DOWN": "▼", "SIDEWAYS": "◆"}
+    colors = {"UP": "#22c55e", "DOWN": "#ef4444"}
+    icons  = {"UP": "▲", "DOWN": "▼"}
     c = colors.get(prediction, "#6b7280")
     i = icons.get(prediction, "?")
     return (

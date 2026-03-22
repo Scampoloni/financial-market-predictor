@@ -31,6 +31,9 @@ html, body, [data-testid="stAppViewContainer"] {
 /* Hide Streamlit branding */
 #MainMenu, footer, header { visibility: hidden; }
 
+/* Block container */
+.block-container { padding-top: 2rem; max-width: 1200px; }
+
 /* Buttons */
 .stButton > button {
     background: linear-gradient(135deg, #1f6feb, #388bfd);
@@ -81,10 +84,13 @@ hr { border-color: #30363d; }
 
 /* Dataframe */
 [data-testid="stDataFrame"] { border: 1px solid #30363d; border-radius: 8px; }
+
+/* Header styling */
+h1 { font-weight: 600; letter-spacing: -0.02em; }
 </style>
 """, unsafe_allow_html=True)
 
-from src.app.pages import predictor, about
+from src.app.pages import predictor, about, model_analysis
 
 # ── Navigation ──────────────────────────────────────────────────────────────
 col_logo, col_nav = st.columns([1, 4])
@@ -92,7 +98,7 @@ with col_logo:
     st.markdown("### 📈 Market Predictor")
 with col_nav:
     nav = st.radio(
-        "", ["Prediction", "About"],
+        "Navigation", ["Prediction", "Analysis", "About"],
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -101,5 +107,7 @@ st.markdown("<hr style='margin:0 0 1.5rem 0'>", unsafe_allow_html=True)
 
 if nav == "Prediction":
     predictor.render()
+elif nav == "Analysis":
+    model_analysis.render()
 else:
     about.render()

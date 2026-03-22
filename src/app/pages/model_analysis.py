@@ -26,7 +26,7 @@ def render() -> None:
     st.header("Model Analysis — Ablation Study")
     st.markdown(
         "The ablation study measures the marginal contribution of each feature block "
-        "by training the same RandomForest model on progressively richer feature sets."
+        "by training multiple models (RandomForest, LightGBM, Stacking) on progressively richer feature sets."
     )
 
     results = load_ablation_results()
@@ -35,7 +35,7 @@ def render() -> None:
         return
 
     # --- Summary table ---
-    st.subheader("Official Ablation Results")
+    st.subheader("Best Model per Config")
     config_names = {"A": "Market only", "B": "Market + NLP", "C": "Market + NLP + CV"}
     baseline_f1 = results["A"]["test_f1_macro"]
     rows = []
@@ -44,6 +44,7 @@ def render() -> None:
         rows.append({
             "Config": cfg,
             "Description": config_names.get(cfg, cfg),
+            "Best Model": r.get("best_model", "RandomForest"),
             "# Features": r["n_features"],
             "CV F1 (mean ± std)": f"{r['cv_f1_mean']:.4f} ± {r['cv_f1_std']:.4f}",
             "Test F1": round(r["test_f1_macro"], 4),
@@ -52,8 +53,24 @@ def render() -> None:
         })
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
+    # --- Per-model breakdown ---
+    if any("per_model" in r for r in results.values()):
+        st.subheader("Per-Model Breakdown")
+        pm_rows = []
+        for cfg, r in results.items():
+            for model_name, mr in r.get("per_model", {}).items():
+                pm_rows.append({
+                    "Config": cfg,
+                    "Model": model_name,
+                    "CV F1": f"{mr['cv_f1_mean']:.4f} ± {mr['cv_f1_std']:.4f}",
+                    "Test F1": round(mr["test_f1_macro"], 4),
+                    "Test Acc": round(mr["test_accuracy"], 4),
+                })
+        if pm_rows:
+            st.dataframe(pd.DataFrame(pm_rows), hide_index=True, use_container_width=True)
+
     # --- Bar chart ---
-    st.subheader("Test F1 by Config")
+    st.subheader("Test F1 by Config (Best Model)")
     fig, ax = plt.subplots(figsize=(7, 3.5))
     cfgs = list(results.keys())
     f1s  = [results[c]["test_f1_macro"] for c in cfgs]
@@ -79,34 +96,36 @@ def render() -> None:
     per_class_data = []
     for cfg, r in results.items():
         for cls in TARGET_CLASSES:
-            per_class_data.append({
-                "Config": f"Config {cfg}",
-                "Class": cls,
-                "F1": r["per_class"][cls]["f1"],
-                "Precision": r["per_class"][cls]["precision"],
-                "Recall": r["per_class"][cls]["recall"],
-            })
-    pc_df = pd.DataFrame(per_class_data)
-    pivot = pc_df.pivot(index="Class", columns="Config", values="F1").round(4)
-    st.dataframe(pivot, use_container_width=True)
+            if cls in r.get("per_class", {}):
+                per_class_data.append({
+                    "Config": f"Config {cfg}",
+                    "Class": cls,
+                    "F1": r["per_class"][cls]["f1"],
+                    "Precision": r["per_class"][cls]["precision"],
+                    "Recall": r["per_class"][cls]["recall"],
+                })
+    if per_class_data:
+        pc_df = pd.DataFrame(per_class_data)
+        pivot = pc_df.pivot(index="Class", columns="Config", values="F1").round(4)
+        st.dataframe(pivot, use_container_width=True)
 
-    fig2, ax2 = plt.subplots(figsize=(8, 4))
-    x = np.arange(len(TARGET_CLASSES))
-    width = 0.25
-    cfg_list = [f"Config {c}" for c in cfgs]
-    cfg_colors = bar_colors[:len(cfgs)]
-    for i, (cfg, color) in enumerate(zip(cfg_list, cfg_colors)):
-        vals = [pc_df[(pc_df["Config"] == cfg) & (pc_df["Class"] == cls)]["F1"].values[0]
-                for cls in TARGET_CLASSES]
-        ax2.bar(x + i * width, vals, width, label=cfg, color=color, alpha=0.85)
-    ax2.set_xticks(x + width)
-    ax2.set_xticklabels(TARGET_CLASSES)
-    ax2.set_ylabel("F1")
-    ax2.set_title("Per-Class F1 — All Configs")
-    ax2.legend()
-    fig2.tight_layout()
-    st.pyplot(fig2, use_container_width=True)
-    plt.close(fig2)
+        fig2, ax2 = plt.subplots(figsize=(8, 4))
+        x = np.arange(len(TARGET_CLASSES))
+        width = 0.25
+        cfg_list = [f"Config {c}" for c in cfgs]
+        cfg_colors = bar_colors[:len(cfgs)]
+        for i, (cfg, color) in enumerate(zip(cfg_list, cfg_colors)):
+            vals = [pc_df[(pc_df["Config"] == cfg) & (pc_df["Class"] == cls)]["F1"].values[0]
+                    for cls in TARGET_CLASSES]
+            ax2.bar(x + i * width, vals, width, label=cfg, color=color, alpha=0.85)
+        ax2.set_xticks(x + width)
+        ax2.set_xticklabels(TARGET_CLASSES)
+        ax2.set_ylabel("F1")
+        ax2.set_title("Per-Class F1 — All Configs")
+        ax2.legend()
+        fig2.tight_layout()
+        st.pyplot(fig2, use_container_width=True)
+        plt.close(fig2)
 
     # --- CV fold F1 ---
     st.subheader("Cross-Validation Fold F1")
@@ -131,8 +150,7 @@ def render() -> None:
         st.subheader("Feature Importance — Config C (Top 25)")
         feat_cols = results["C"]["feature_cols"]
         st.markdown(
-            "Feature importances are estimated from the saved Config C RandomForest model "
-            "(mean decrease in impurity). "
+            "Feature importances from the saved Config C model. "
             "**Blue** = market, **orange** = NLP, **green** = CV."
         )
         try:
@@ -141,8 +159,26 @@ def render() -> None:
             with open(STACKING_MODEL_PATH, "rb") as f:
                 saved = pickle.load(f)
             model = saved["model"]
-            importances = pd.Series(model.feature_importances_, index=feat_cols).sort_values(ascending=False)
-            top25 = importances.head(25)
+
+            # Try to get feature_importances_ — works for RF/LGB/XGB
+            # For StackingClassifier, extract from best named estimator
+            if hasattr(model, "feature_importances_"):
+                importances = pd.Series(model.feature_importances_, index=feat_cols)
+            elif hasattr(model, "named_estimators_"):
+                # Use the RF estimator from the stacking ensemble
+                for name, est in model.named_estimators_.items():
+                    if hasattr(est, "feature_importances_"):
+                        importances = pd.Series(est.feature_importances_, index=feat_cols)
+                        st.caption(f"Showing importances from '{name}' estimator within the Stacking ensemble.")
+                        break
+                else:
+                    st.info("Feature importances not available for this model type.")
+                    return
+            else:
+                st.info("Feature importances not available for this model type.")
+                return
+
+            top25 = importances.sort_values(ascending=False).head(25)
             colors = [_block_color(f) for f in top25.index]
 
             fig4, ax4 = plt.subplots(figsize=(10, 7))
@@ -160,10 +196,5 @@ def render() -> None:
             st.pyplot(fig4, use_container_width=True)
             plt.close(fig4)
 
-            st.dataframe(
-                top25.reset_index().rename(columns={"index": "Feature", 0: "Importance"}).head(15),
-                hide_index=True,
-                use_container_width=True,
-            )
         except Exception as exc:
             st.warning(f"Could not load model for feature importance: {exc}")
