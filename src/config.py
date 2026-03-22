@@ -38,6 +38,7 @@ TICKERS_CSV_PATH = METADATA_DIR / "tickers.csv"
 # Model artifacts
 XGBOOST_MODEL_PATH = MODELS_DIR / "xgboost_final.pkl"
 STACKING_MODEL_PATH = MODELS_DIR / "stacking_final.pkl"
+MODEL_21D_PATH = MODELS_DIR / "model_21d.pkl"
 SCALER_PATH = MODELS_DIR / "scaler.pkl"
 PCA_NLP_PATH = MODELS_DIR / "pca_nlp.pkl"
 PCA_CV_PATH = MODELS_DIR / "pca_cv.pkl"
@@ -63,8 +64,9 @@ VAL_END = "2024-12-31"
 TEST_START = "2025-01-01"
 TEST_END = "2025-12-31"
 
-# Target definition: 5-day forward return, binary classification
+# Target definition: binary classification
 TARGET_HORIZON_DAYS = 5          # predict 5-trading-day forward return
+TARGET_HORIZON_DAYS_LONG = 21   # predict 21-trading-day (~1 month) forward return
 TARGET_CLASSES = ["DOWN", "UP"]  # binary: return <= 0 → DOWN, > 0 → UP
 
 # ---------------------------------------------------------------------------
@@ -127,6 +129,95 @@ TICKER_SECTOR_MAP: dict[str, str] = {
 
 # Market index tickers (for VIX and benchmark)
 MARKET_INDICES = ["^VIX", "^GSPC"]
+
+# ---------------------------------------------------------------------------
+# Company name mapping for news relevance filtering
+# ---------------------------------------------------------------------------
+COMPANY_KEYWORDS: dict[str, list[str]] = {
+    # Technology
+    "AAPL": ["apple", "iphone", "ipad", "mac", "tim cook", "ios", "app store", "macbook"],
+    "MSFT": ["microsoft", "windows", "azure", "copilot", "satya nadella", "xbox", "office 365"],
+    "NVDA": ["nvidia", "jensen huang", "cuda", "geforce", "gpu", "rtx"],
+    "GOOGL": ["google", "alphabet", "youtube", "gemini", "sundar pichai", "android", "waymo"],
+    "META": ["meta platforms", "meta glasses", "meta ai", "meta vr", "meta trial",
+             "meta drops", "meta isn", "facebook", "instagram", "whatsapp", "zuckerberg", "threads", "metaverse"],
+    "AMZN": ["amazon", "aws", "jeff bezos", "andy jassy", "prime video"],
+    "TSLA": ["tesla", "elon musk", "electric vehicle", "autopilot", "cybertruck"],
+    "AMD": ["amd", "advanced micro", "lisa su", "radeon", "ryzen", "epyc"],
+    "INTC": ["intel", "pat gelsinger", "core ultra"],
+    "QCOM": ["qualcomm", "snapdragon"],
+    "CRM": ["salesforce", "marc benioff"],
+    "ORCL": ["oracle", "larry ellison"],
+    "ADBE": ["adobe", "photoshop", "creative cloud"],
+    "NOW": ["servicenow"],
+    "INTU": ["intuit", "turbotax", "quickbooks"],
+    # Finance
+    "JPM": ["jpmorgan", "jp morgan", "jamie dimon", "chase bank"],
+    "GS": ["goldman sachs", "goldman"],
+    "BAC": ["bank of america"],
+    "MS": ["morgan stanley"],
+    "V": ["visa"],
+    "MA": ["mastercard"],
+    "BRK-B": ["berkshire hathaway", "warren buffett", "berkshire"],
+    "C": ["citigroup", "citibank", "citi"],
+    "WFC": ["wells fargo"],
+    "AXP": ["american express", "amex"],
+    "BLK": ["blackrock", "larry fink"],
+    "SCHW": ["charles schwab", "schwab"],
+    # Insurance
+    "AIG": ["aig", "american international group"],
+    "MET": ["metlife"],
+    "PRU": ["prudential"],
+    "ALL": ["allstate"],
+    "TRV": ["travelers"],
+    # Healthcare
+    "JNJ": ["johnson & johnson", "johnson and johnson", "j&j"],
+    "PFE": ["pfizer"],
+    "UNH": ["unitedhealth", "united health"],
+    "ABBV": ["abbvie"],
+    "MRK": ["merck"],
+    "LLY": ["eli lilly", "lilly"],
+    "TMO": ["thermo fisher"],
+    "ABT": ["abbott"],
+    "AMGN": ["amgen"],
+    "GILD": ["gilead"],
+    # Consumer
+    "KO": ["coca-cola", "coca cola", "coke"],
+    "PEP": ["pepsi", "pepsico"],
+    "MCD": ["mcdonald"],
+    "NKE": ["nike"],
+    "SBUX": ["starbucks"],
+    "PG": ["procter & gamble", "procter and gamble", "p&g"],
+    "WMT": ["walmart", "wal-mart"],
+    "COST": ["costco"],
+    "TGT": ["target corp"],
+    "HD": ["home depot"],
+    # Energy
+    "XOM": ["exxon", "exxonmobil"],
+    "CVX": ["chevron"],
+    "COP": ["conocophillips", "conoco"],
+    "SLB": ["schlumberger"],
+    "EOG": ["eog resources"],
+    "PSX": ["phillips 66"],
+    # Industrial
+    "BA": ["boeing"],
+    "CAT": ["caterpillar"],
+    "GE": ["general electric"],
+    "MMM": ["3m company"],
+    "HON": ["honeywell"],
+    "UPS": ["ups", "united parcel"],
+    "FDX": ["fedex", "federal express"],
+    "RTX": ["raytheon", "rtx corp"],
+    "LMT": ["lockheed martin", "lockheed"],
+}
+
+SPAM_KEYWORDS: list[str] = [
+    "comedy", "movie", "film", "bachelorette", "celebrity", "glyphosate",
+    "recipe", "fashion", "nba ", "nfl ", "soccer", "music", "album",
+    "actor", "actress", "kernel", "npm", "pypi", "github release",
+    "changelog", "open source", "mixed precision", "numkong", "satirical",
+    "marketing ner", "sugar harmony", "singapore air", "roundtrip",
+]
 
 # ---------------------------------------------------------------------------
 # Feature engineering constants
