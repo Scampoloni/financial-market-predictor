@@ -32,6 +32,7 @@ import optuna
 
 from src.config import (
     CV_FOLDS,
+    FEATURES_ANALYST_PATH,
     FEATURES_CV_PATH,
     FEATURES_MARKET_PATH,
     FEATURES_NLP_PATH,
@@ -95,6 +96,19 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
 
     combined_mi = market_mi.join(nlp_mi, how="left")
     combined_mi[nlp_cols] = combined_mi[nlp_cols].fillna(0)
+
+    # Join analyst features (part of NLP block) if available
+    if FEATURES_ANALYST_PATH.exists():
+        logger.info("Loading analyst features ...")
+        analyst = pd.read_parquet(FEATURES_ANALYST_PATH)
+        analyst.index = pd.to_datetime(analyst.index)
+        analyst.index.name = "date"
+        analyst_cols = [c for c in analyst.columns if c != "ticker"]
+        analyst_mi = analyst.set_index("ticker", append=True)[analyst_cols]
+        combined_mi = combined_mi.join(analyst_mi, how="left")
+        # Fill: consensus/momentum with 0 (neutral), coverage with 0, upside with 0
+        combined_mi[analyst_cols] = combined_mi[analyst_cols].fillna(0)
+        logger.info("Joined %d analyst feature columns", len(analyst_cols))
 
     if config == "B":
         return combined_mi.reset_index("ticker").sort_index()
@@ -234,6 +248,11 @@ def train_stacking(
     """
     lgb_params = lgb_params or {}
 
+    # Compute scale_pos_weight for XGBoost from training labels
+    neg = (y_train == "DOWN").sum()
+    pos = (y_train == "UP").sum()
+    spw = neg / pos if pos > 0 else 1.0
+
     estimators = [
         ("rf", RandomForestClassifier(
             n_estimators=300, max_depth=10, min_samples_leaf=5,
@@ -241,6 +260,7 @@ def train_stacking(
         )),
         ("xgb", xgb.XGBClassifier(
             n_estimators=500, learning_rate=0.05, max_depth=5,
+            scale_pos_weight=spw,
             eval_metric="logloss", random_state=42, n_jobs=-1,
         )),
         ("lgb", lgb.LGBMClassifier(

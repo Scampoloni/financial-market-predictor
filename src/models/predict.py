@@ -184,6 +184,52 @@ class LivePredictor:
 
         return pd.Series(nlp_feat)
 
+    def build_analyst_features(self, ticker: str, current_price: float | None = None) -> pd.Series:
+        """Fetch current analyst ratings and build sentiment features."""
+        import yfinance as yf
+        from src.data_collection.build_analyst_features import (
+            build_analyst_features_for_ticker,
+        )
+
+        defaults = pd.Series({
+            "analyst_consensus": 0.0,
+            "analyst_upgrade_score": 0.0,
+            "analyst_coverage_count": 0.0,
+            "price_target_upside": 0.0,
+            "analyst_sentiment_momentum": 0.0,
+        })
+
+        try:
+            today = pd.Timestamp.today().normalize()
+            dates = pd.date_range(end=today, periods=120, freq="B")
+            feat = build_analyst_features_for_ticker(ticker, dates)
+            if feat is None or feat.empty:
+                return defaults
+
+            latest = feat.iloc[-1].drop("ticker", errors="ignore")
+
+            # Price target upside — fetch current targets
+            if current_price and current_price > 0:
+                try:
+                    pt = yf.Ticker(ticker).analyst_price_targets
+                    if isinstance(pt, dict):
+                        mean_t = float(pt.get("mean", 0) or 0)
+                        if mean_t > 0:
+                            latest["price_target_upside"] = (mean_t - current_price) / current_price
+                except Exception:
+                    pass
+
+            result = defaults.copy()
+            for col in defaults.index:
+                if col in latest.index:
+                    v = latest[col]
+                    result[col] = float(v) if pd.notna(v) else 0.0
+            return result
+
+        except Exception as exc:
+            logger.warning("%s: analyst features failed (%s) — using zeros", ticker, exc)
+            return defaults
+
     def build_cv_features(self, ticker: str, ohlcv_df: pd.DataFrame | None = None, n_pca: int = 10) -> pd.Series:
         """Generate latest chart image and extract CNN embedding.
 
@@ -259,6 +305,7 @@ class LivePredictor:
         nlp_feat: pd.Series,
         cv_feat: pd.Series,
         horizon: int = 5,
+        analyst_feat: pd.Series | None = None,
     ) -> dict:
         """Run model inference from pre-built features."""
         self.load_model(horizon)
@@ -267,7 +314,10 @@ class LivePredictor:
         latest_row = market_feat.iloc[-1].copy()
         latest_date = market_feat.index[-1]
 
-        all_feat = pd.concat([latest_row, nlp_feat, cv_feat])
+        parts = [latest_row, nlp_feat, cv_feat]
+        if analyst_feat is not None:
+            parts.append(analyst_feat)
+        all_feat = pd.concat(parts)
         feature_vec = (
             pd.DataFrame([all_feat])
             .reindex(columns=feature_cols, fill_value=0)
@@ -308,5 +358,7 @@ class LivePredictor:
         market = self.build_market_features(ticker, ohlcv_df=ohlcv)
         nlp = self.build_nlp_features(ticker)
         cv = self.build_cv_features(ticker, ohlcv_df=ohlcv)
+        current_price = float(ohlcv["Close"].iloc[-1]) if not ohlcv.empty else None
+        analyst = self.build_analyst_features(ticker, current_price=current_price)
 
-        return self.predict_from_features(ticker, market, nlp, cv, horizon)
+        return self.predict_from_features(ticker, market, nlp, cv, horizon, analyst_feat=analyst)

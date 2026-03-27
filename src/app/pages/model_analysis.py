@@ -15,7 +15,7 @@ from src.config import TARGET_CLASSES, CV_FOLDS, STACKING_MODEL_PATH
 _MUTED = "#64748b"
 _CFG_NAMES = {"A": "Market only", "B": "Market + NLP", "C": "Market + NLP + CV"}
 _CFG_COLORS = {"A": "#94a3b8", "B": "#8b5cf6", "C": "#10b981"}
-_CFG_FEAT_COUNTS = {"A": "28 features", "B": "51 features", "C": "61 features"}
+_CFG_FEAT_COUNTS = {"A": "32 features", "B": "56 features", "C": "66 features"}
 
 
 def _block_color(feat: str) -> str:

@@ -31,6 +31,7 @@ FEATURES_MARKET_PATH = PROCESSED_DIR / "features_market.parquet"
 FEATURES_NLP_PATH = PROCESSED_DIR / "features_nlp.parquet"
 FEATURES_CV_PATH = PROCESSED_DIR / "features_cv.parquet"
 FEATURES_COMBINED_PATH = PROCESSED_DIR / "features_combined.parquet"
+FEATURES_ANALYST_PATH = PROCESSED_DIR / "features_analyst.parquet"
 
 # Metadata
 TICKERS_CSV_PATH = METADATA_DIR / "tickers.csv"

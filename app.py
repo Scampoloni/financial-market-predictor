@@ -70,30 +70,7 @@ h3 { font-size: 1.15rem !important; }
     letter-spacing: -0.02em;
 }
 .nav-brand span { color: #3b82f6; }
-.nav-links {
-    display: flex;
-    gap: 4px;
-    background: #111827;
-    padding: 4px;
-    border-radius: 10px;
-    border: 1px solid #1e293b;
-}
-.nav-link {
-    padding: 8px 20px;
-    border-radius: 8px;
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: #94a3b8;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.nav-link:hover { color: #e2e8f0; background: #1e293b; }
-.nav-link.active {
-    background: linear-gradient(135deg, #1e40af, #3b82f6);
-    color: white;
-    font-weight: 600;
-}
+/* nav-links removed — using st.tabs() */
 
 /* ── Cards ── */
 .glass-card {
@@ -132,9 +109,7 @@ h3 { font-size: 1.15rem !important; }
 }
 .stSelectbox label { color: #94a3b8 !important; }
 
-/* ── Radio (for nav fallback) ── */
-.stRadio > div { gap: 0 !important; }
-.stRadio [data-baseweb="radio"] { display: none !important; }
+/* radio nav removed — using st.tabs() */
 
 /* ── Metric cards ── */
 [data-testid="metric-container"] {
@@ -274,39 +249,26 @@ hr { border-color: #1e293b !important; margin: 1rem 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-from src.app.pages import predictor, about, model_analysis
+from src.app.pages import predictor, about, model_analysis, rag_chat
 
-# ── Navigation ──────────────────────────────────────────────────────────────
-if "nav" not in st.session_state:
-    st.session_state.nav = "Prediction"
-
-# Render custom nav bar
-nav_items = ["Prediction", "Analysis", "About"]
-active = st.session_state.nav
-
-nav_html = '<div class="nav-bar"><div class="nav-brand"><span>📈</span> Market Predictor</div><div class="nav-links">'
-for item in nav_items:
-    cls = "nav-link active" if item == active else "nav-link"
-    nav_html += f'<div class="{cls}">{item}</div>'
-nav_html += '</div></div>'
-st.markdown(nav_html, unsafe_allow_html=True)
-
-# Streamlit radio for actual navigation (hidden by CSS)
-nav = st.radio(
-    "nav", nav_items,
-    index=nav_items.index(active),
-    horizontal=True,
-    label_visibility="collapsed",
-    key="nav_radio",
+# ── Branding ─────────────────────────────────────────────────────────────────
+st.markdown(
+    '<div class="nav-bar"><div class="nav-brand"><span>📈</span> Market Predictor</div></div>',
+    unsafe_allow_html=True,
 )
-if nav != st.session_state.nav:
-    st.session_state.nav = nav
-    st.rerun()
 
-# ── Page router ─────────────────────────────────────────────────────────────
-if st.session_state.nav == "Prediction":
+# ── Navigation via native Streamlit tabs ─────────────────────────────────────
+tab_pred, tab_compare, tab_analysis, tab_chat, tab_about = st.tabs(
+    ["Prediction", "Compare", "Analysis", "News Chat", "About"]
+)
+
+with tab_pred:
     predictor.render()
-elif st.session_state.nav == "Analysis":
+with tab_compare:
+    predictor.render_compare()
+with tab_analysis:
     model_analysis.render()
-else:
+with tab_chat:
+    rag_chat.render()
+with tab_about:
     about.render()

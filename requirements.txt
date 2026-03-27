@@ -19,3 +19,6 @@ feedparser>=6.0.0
 rapidfuzz>=3.3.0
 google-generativeai>=0.3.0
 Pillow>=10.0.0
+sentence-transformers>=2.6.0
+joblib>=1.3.0
+pyarrow>=14.0.0

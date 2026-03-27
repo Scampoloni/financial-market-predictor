@@ -215,8 +215,28 @@ def _candlestick_chart(df: pd.DataFrame, days: int = 90) -> None:
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
+def _load_ticker_news_dates(ticker: str) -> dict[str, str]:
+    """Return {date_str: headline} for high-sentiment days (|sentiment| > 0.2)."""
+    try:
+        from src.data_collection.news_scraper import load_ticker_news
+        news = load_ticker_news(ticker)
+        if news.empty or "published" not in news.columns:
+            return {}
+        news["date"] = pd.to_datetime(news["published"]).dt.date.astype(str)
+        # Keep only dates with significant news (most recent per day)
+        result = {}
+        for date_str, grp in news.groupby("date"):
+            result[date_str] = grp["title"].iloc[0][:60] + "…"
+        return result
+    except Exception:
+        return {}
+
+
 def _sentiment_timeline(ticker: str, nlp_pct: float | None = None) -> None:
-    """Render a dual-axis chart: closing price (line) + daily sentiment (bars)."""
+    """Render a dual-axis chart: closing price (line) + daily sentiment (bars).
+
+    News events with |sentiment| > 0.2 are annotated with vertical markers.
+    """
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
 
@@ -247,6 +267,34 @@ def _sentiment_timeline(ticker: str, nlp_pct: float | None = None) -> None:
         x=data.index, y=data["finbert_sentiment"],
         name="Sentiment", marker_color=bar_colors, opacity=0.7,
     ), secondary_y=True)
+
+    # ── News event annotations (vertical markers on significant days) ─────────
+    news_dates = _load_ticker_news_dates(ticker)
+    significant_days = data[data["finbert_sentiment"].abs() > 0.2].index
+    for date in significant_days:
+        date_str = str(date.date()) if hasattr(date, "date") else str(date)[:10]
+        headline = news_dates.get(date_str, f"Significant sentiment ({date_str})")
+        marker_color = _UP_COLOR if data.loc[date, "finbert_sentiment"] > 0 else _DOWN_COLOR
+        fig.add_vline(
+            x=date,
+            line_color=marker_color,
+            line_dash="dot",
+            line_width=1.5,
+            opacity=0.6,
+        )
+        fig.add_annotation(
+            x=date,
+            y=1.0,
+            yref="paper",
+            text="📰",
+            showarrow=False,
+            font=dict(size=10),
+            hovertext=headline,
+            bgcolor="#1e293b",
+            bordercolor=marker_color,
+            borderpad=2,
+            yshift=10,
+        )
 
     fig.update_layout(
         template="plotly_dark",
@@ -302,6 +350,12 @@ def _render_prediction_card(result: dict) -> None:
 
     signal_label, signal_color = _signal_strength(conf)
 
+    # Baseline-relative confidence: how far above 50% coin-flip
+    baseline_delta = (conf - 0.5) * 100  # pp above random
+    baseline_color = _UP_COLOR if baseline_delta >= 0 else _DOWN_COLOR
+    # Width of the confidence fill relative to 50%
+    fill_pct = min(int((conf - 0.5) * 200), 100)  # 0-100% of right half
+
     st.markdown(
         f'<div class="pred-card {card_class}">'
         f'<div style="font-size:0.8rem;color:{_MUTED};font-weight:600;text-transform:uppercase;'
@@ -310,12 +364,21 @@ def _render_prediction_card(result: dict) -> None:
         f'<div style="font-size:1.8rem;font-weight:800;color:{color};margin:4px 0;'
         f'letter-spacing:-0.02em">{pred}</div>'
         f'<div style="color:{_MUTED};font-size:0.88rem">'
-        f'Confidence: <b style="color:{color}">{conf:.0%}</b></div>'
-        f'<div style="margin:8px 0 16px"><span style="background:{signal_color}18;color:{signal_color};'
+        f'Confidence: <b style="color:{color}">{conf:.0%}</b>'
+        f' &nbsp;·&nbsp; <span style="color:{baseline_color};font-size:0.82rem">'
+        f'{baseline_delta:+.1f} pp vs 50% baseline</span></div>'
+        f'<div style="margin:8px 0 4px"><span style="background:{signal_color}18;color:{signal_color};'
         f'padding:3px 12px;border-radius:20px;font-size:0.78rem;font-weight:700">'
         f'{signal_label}</span></div>'
+        f'<div style="margin:8px 0 4px;font-size:0.75rem;color:{_MUTED}">'
+        f'Edge above random chance:</div>'
+        f'<div style="background:#1e293b;border-radius:6px;height:6px;overflow:hidden;margin-bottom:12px">'
+        f'<div style="width:50%;height:100%;background:#1e293b;display:inline-block"></div>'
+        f'<div style="width:{fill_pct}%;height:6px;background:{baseline_color};'
+        f'border-radius:0 4px 4px 0;display:inline-block;vertical-align:top"></div>'
+        f'</div>'
         f'<div>'
-        f'<div style="display:flex;justify-content:space-between;margin-bottom:6px">'
+        f'<div style="display:flex;justify-content:space-between;margin-bottom:4px">'
         f'<span style="color:{_DOWN_COLOR};font-size:0.82rem;font-weight:700">↓ {down_prob:.0%}</span>'
         f'<span style="color:{_UP_COLOR};font-size:0.82rem;font-weight:700">↑ {up_prob:.0%}</span></div>'
         f'<div style="background:#1e293b;border-radius:6px;height:8px;overflow:hidden;display:flex">'
@@ -347,8 +410,12 @@ def _render_details_card(result: dict) -> None:
 
 # ── Market context metrics ───────────────────────────────────────────────────
 
-def _render_market_context(market_feat: pd.DataFrame, nlp_feat: pd.Series) -> None:
-    """Show 4 key market context metrics below the chart."""
+def _render_market_context(
+    market_feat: pd.DataFrame,
+    nlp_feat: pd.Series,
+    analyst_feat: pd.Series | None = None,
+) -> None:
+    """Show 5 key market context metrics below the chart."""
     row = market_feat.iloc[-1]
 
     rsi = row.get("rsi_14", np.nan)
@@ -356,7 +423,7 @@ def _render_market_context(market_feat: pd.DataFrame, nlp_feat: pd.Series) -> No
     vol_ratio = row.get("volume_ratio", np.nan)
     sentiment = nlp_feat.get("finbert_sentiment", 0.0)
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
 
     with c1:
         rsi_delta = "Overbought" if rsi > 70 else "Oversold" if rsi < 30 else "Neutral"
@@ -375,6 +442,22 @@ def _render_market_context(market_feat: pd.DataFrame, nlp_feat: pd.Series) -> No
         st.metric("Vol vs 20D Avg", vol_label,
                   delta="Above avg" if vol_ratio > 1.2 else "Below avg" if vol_ratio < 0.8 else "Normal",
                   delta_color="off")
+    with c5:
+        if analyst_feat is not None:
+            consensus = float(analyst_feat.get("analyst_consensus", 0.0))
+            coverage = int(analyst_feat.get("analyst_coverage_count", 0))
+            upside = float(analyst_feat.get("price_target_upside", 0.0))
+            if coverage > 0:
+                cons_label = "Buy" if consensus >= 1.5 else "Outperform" if consensus >= 0.8 else \
+                             "Hold" if consensus >= -0.5 else "Underperform" if consensus >= -1.5 else "Sell"
+                cons_delta = f"{coverage} analysts"
+                upside_str = f" · {upside:+.1%}" if upside != 0 else ""
+                st.metric("Analyst Rating", f"{cons_label}{upside_str}", delta=cons_delta,
+                          delta_color="normal" if consensus > 0 else "inverse" if consensus < 0 else "off")
+            else:
+                st.metric("Analyst Rating", "–", delta="No coverage", delta_color="off")
+        else:
+            st.metric("Analyst Rating", "–", delta="Not loaded", delta_color="off")
 
 
 # ── Feature drivers chart ────────────────────────────────────────────────────
@@ -394,15 +477,17 @@ def _render_feature_drivers(predictor, horizon: int, feature_vec: pd.Series) -> 
 
     for feat_name, importance in top_imp.items():
         label = _FEAT_LABELS.get(feat_name, feat_name)
+        if len(label) > 15:
+            label = label[:14] + "…"
         feat_val = feature_vec.get(feat_name, 0.0)
         direction, color = _feat_direction(feat_name, feat_val)
         names.append(label)
         values.append(importance)
         colors.append(color)
         if direction:
-            annotations.append(f"{direction} ({feat_val:+.3f})")
+            annotations.append(f"{direction} ({feat_val:+.2f})")
         else:
-            annotations.append(f"{feat_val:.3f}")
+            annotations.append(f"{feat_val:.2f}")
 
     # Reverse for Plotly (bottom → top)
     names, values, colors, annotations = names[::-1], values[::-1], colors[::-1], annotations[::-1]
@@ -419,7 +504,7 @@ def _render_feature_drivers(predictor, horizon: int, feature_vec: pd.Series) -> 
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         height=220,
-        margin=dict(l=10, r=100, t=5, b=5),
+        margin=dict(l=10, r=130, t=5, b=5),
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
         yaxis=dict(gridcolor="#1e293b", tickfont=dict(size=12, color="#e2e8f0")),
         font=dict(family="Inter, sans-serif"),
@@ -545,7 +630,7 @@ def _render_backtest(ticker: str, horizon: int) -> None:
     """Render the backtest expander with chart and metrics."""
     import plotly.graph_objects as go
 
-    with st.expander("Historical Prediction Accuracy", expanded=False):
+    with st.expander("📊 Historical Prediction Accuracy", expanded=True):
         bt = _compute_backtest(ticker, horizon)
         if bt is None or len(bt) < 10:
             st.markdown(
@@ -629,16 +714,55 @@ def _render_backtest(ticker: str, horizon: int) -> None:
 
 # ── Main render ──────────────────────────────────────────────────────────────
 
+def _render_watchlist() -> str | None:
+    """Render watchlist quick-buttons. Returns ticker if quick-button was clicked."""
+    if "watchlist" not in st.session_state:
+        st.session_state.watchlist = []
+
+    watchlist = st.session_state.watchlist
+    if not watchlist:
+        return None
+
+    st.markdown(
+        f"<div style='margin-bottom:0.4rem'>"
+        f"<span style='color:{_MUTED};font-size:0.78rem;font-weight:600;'"
+        f"text-transform:uppercase;letter-spacing:0.05em'>Recent:</span></div>",
+        unsafe_allow_html=True,
+    )
+    cols = st.columns(min(len(watchlist), 6))
+    for i, t in enumerate(watchlist[:6]):
+        with cols[i]:
+            if st.button(t, key=f"wl_{t}", use_container_width=True):
+                return t
+    return None
+
+
+def _add_to_watchlist(ticker: str) -> None:
+    """Add ticker to watchlist (max 6, deduplicated, most-recent first)."""
+    if "watchlist" not in st.session_state:
+        st.session_state.watchlist = []
+    wl = st.session_state.watchlist
+    if ticker in wl:
+        wl.remove(ticker)
+    wl.insert(0, ticker)
+    st.session_state.watchlist = wl[:6]
+
+
 def render() -> None:
     predictor = get_predictor()
+
+    # ── Watchlist quick-access ───────────────────────────────────────────────
+    clicked_ticker = _render_watchlist()
 
     # ── Ticker selector row ──────────────────────────────────────────────────
     col_sel, col_horizon, col_btn, _ = st.columns([2, 1.5, 1, 2.5])
 
     with col_sel:
+        default_idx = TICKERS_SORTED.index(clicked_ticker) if clicked_ticker and clicked_ticker in TICKERS_SORTED \
+            else (TICKERS_SORTED.index("AAPL") if "AAPL" in TICKERS_SORTED else 0)
         ticker = st.selectbox(
             "Ticker", TICKERS_SORTED,
-            index=TICKERS_SORTED.index("AAPL") if "AAPL" in TICKERS_SORTED else 0,
+            index=default_idx,
             label_visibility="collapsed",
         )
 
@@ -725,32 +849,42 @@ def render() -> None:
         market_feat = predictor.build_market_features(ticker, ohlcv_df=ohlcv)
 
         progress_text.markdown("📰 **Running sentiment analysis (FinBERT + VADER)...**")
-        progress_bar.progress(40)
+        progress_bar.progress(35)
         nlp_feat = predictor.build_nlp_features(ticker)
 
+        progress_text.markdown("🏦 **Fetching analyst ratings & price targets...**")
+        progress_bar.progress(55)
+        current_price = float(ohlcv["Close"].iloc[-1]) if not ohlcv.empty else None
+        analyst_feat = predictor.build_analyst_features(ticker, current_price=current_price)
+
         progress_text.markdown("📈 **Processing chart patterns (EfficientNet-B0)...**")
-        progress_bar.progress(65)
+        progress_bar.progress(70)
         cv_feat = predictor.build_cv_features(ticker, ohlcv_df=ohlcv)
 
         progress_text.markdown(f"🤖 **Running {selected_horizon}-day prediction model...**")
-        progress_bar.progress(85)
+        progress_bar.progress(88)
         results[selected_horizon] = predictor.predict_from_features(
-            ticker, market_feat, nlp_feat, cv_feat, horizon=selected_horizon
+            ticker, market_feat, nlp_feat, cv_feat, horizon=selected_horizon,
+            analyst_feat=analyst_feat,
         )
 
         # Also run the other horizon if available
         other_horizons = [h for h in horizons if h != selected_horizon]
         for h in other_horizons:
             results[h] = predictor.predict_from_features(
-                ticker, market_feat, nlp_feat, cv_feat, horizon=h
+                ticker, market_feat, nlp_feat, cv_feat, horizon=h,
+                analyst_feat=analyst_feat,
             )
 
         progress_bar.progress(100)
         progress_text.empty()
         progress_bar.empty()
 
+        # Add to watchlist after successful prediction
+        _add_to_watchlist(ticker)
+
         # ── Market context metrics ───────────────────────────────────────────
-        _render_market_context(market_feat, nlp_feat)
+        _render_market_context(market_feat, nlp_feat, analyst_feat=analyst_feat)
 
         # ── Prediction cards ─────────────────────────────────────────────────
         st.markdown("<div style='margin-top:0.5rem'></div>", unsafe_allow_html=True)
@@ -837,5 +971,101 @@ def render() -> None:
         "<p class='disclaimer'>"
         "Research prototype — not financial advice. Predictions are for educational purposes only "
         "and do not constitute investment recommendations. Past patterns do not guarantee future returns.</p>",
+        unsafe_allow_html=True,
+    )
+
+
+# ── Compare tab ───────────────────────────────────────────────────────────────
+
+def render_compare() -> None:
+    """Render side-by-side two-ticker comparison page."""
+    p = get_predictor()
+
+    st.markdown("<h2 style='margin-bottom:4px'>Ticker Comparison</h2>", unsafe_allow_html=True)
+    st.markdown(
+        f"<p style='color:{_MUTED};font-size:0.9rem;margin-bottom:1rem'>"
+        "Compare 5-day predictions for two tickers side by side.</p>",
+        unsafe_allow_html=True,
+    )
+
+    col_a, col_b, col_h, col_run = st.columns([2, 2, 1.5, 1])
+    with col_a:
+        ticker_a = st.selectbox(
+            "Ticker A", TICKERS_SORTED,
+            index=TICKERS_SORTED.index("AAPL") if "AAPL" in TICKERS_SORTED else 0,
+            label_visibility="collapsed", key="cmp_a",
+        )
+    with col_b:
+        ticker_b = st.selectbox(
+            "Ticker B", TICKERS_SORTED,
+            index=TICKERS_SORTED.index("MSFT") if "MSFT" in TICKERS_SORTED else 1,
+            label_visibility="collapsed", key="cmp_b",
+        )
+    with col_h:
+        horizons = p.available_horizons
+        horizon_labels = {5: "5-Day", 21: "21-Day"}
+        opts = [horizon_labels.get(h, f"{h}-Day") for h in horizons]
+        sel = st.selectbox("Horizon", opts, label_visibility="collapsed", key="cmp_h")
+        selected_h = horizons[opts.index(sel)]
+    with col_run:
+        run_cmp = st.button("Compare", type="primary", use_container_width=True, key="cmp_run")
+
+    if run_cmp:
+        results_map = {}
+        for ticker in [ticker_a, ticker_b]:
+            with st.spinner(f"Predicting {ticker}…"):
+                try:
+                    ohlcv = _fetch_ohlcv(ticker)
+                    mf = p.build_market_features(ticker, ohlcv_df=ohlcv)
+                    nf = p.build_nlp_features(ticker)
+                    cf = p.build_cv_features(ticker, ohlcv_df=ohlcv)
+                    price = float(ohlcv["Close"].iloc[-1]) if not ohlcv.empty else None
+                    af = p.build_analyst_features(ticker, current_price=price)
+                    result = p.predict_from_features(ticker, mf, nf, cf, horizon=selected_h, analyst_feat=af)
+                    results_map[ticker] = (result, ohlcv, mf, nf)
+                except Exception as exc:
+                    st.error(f"{ticker}: {exc}")
+
+        if len(results_map) == 2:
+            col1, col2 = st.columns(2)
+            for col, ticker in zip([col1, col2], [ticker_a, ticker_b]):
+                result, ohlcv, mf, nf = results_map[ticker]
+                with col:
+                    # Ticker header
+                    info = _fetch_info(ticker)
+                    sector = TICKER_SECTOR_MAP.get(ticker, "")
+                    st.markdown(
+                        f"<div style='margin-bottom:0.4rem'>"
+                        f"<b style='color:#f0f6fc;font-size:1.05rem'>{html_escape(info['name'])}</b>"
+                        f"<span class='info-tag blue' style='margin-left:8px'>{sector}</span>"
+                        + (f"<span style='color:#f0f6fc;font-weight:700;margin-left:8px'>${info['price']:,.2f}</span>"
+                           if info.get('price') else "")
+                        + "</div>",
+                        unsafe_allow_html=True,
+                    )
+                    _render_prediction_card(result)
+                    # Compact candlestick
+                    if not ohlcv.empty:
+                        _candlestick_chart(ohlcv, days=60)
+                    # Market context
+                    rsi = float(mf.iloc[-1].get("rsi_14", 0))
+                    vol = float(mf.iloc[-1].get("volatility_20d", 0))
+                    sent = float(nf.get("finbert_sentiment", 0)) if hasattr(nf, 'get') else 0.0
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("RSI", f"{rsi:.1f}", delta="Overbought" if rsi > 70 else "Oversold" if rsi < 30 else "Neutral",
+                              delta_color="inverse" if rsi > 70 else "normal" if rsi < 30 else "off")
+                    m2.metric("Vol", f"{vol:.1%}", delta="High" if vol > 0.025 else "Normal", delta_color="inverse" if vol > 0.025 else "off")
+                    m3.metric("Sentiment", f"{sent:+.3f}", delta="Bullish" if sent > 0.05 else "Bearish" if sent < -0.05 else "Neutral",
+                              delta_color="normal" if sent > 0.05 else "inverse" if sent < -0.05 else "off")
+
+    else:
+        st.markdown(
+            f"<p style='color:{_MUTED};text-align:center;margin-top:2rem'>"
+            f"Select two tickers and click <b style='color:#60a5fa'>Compare</b>.</p>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        "<p class='disclaimer'>Research prototype — not financial advice.</p>",
         unsafe_allow_html=True,
     )
