@@ -178,8 +178,8 @@ financial-market-predictor/
 │   │   │   └── about.py            # Project info and methodology
 │   │   └── utils.py                # Shared UI helpers and cached loaders
 │   ├── data_collection/
-│   │   ├── fetch_market_data.py    # Yahoo Finance OHLCV download
-│   │   ├── scrape_ticker_news.py   # RSS + NewsAPI headline scraping
+│   │   ├── market_collector.py     # Yahoo Finance OHLCV download
+│   │   ├── news_scraper.py         # RSS + NewsAPI headline scraping
 │   │   └── chart_generator.py      # mplfinance candlestick chart generation
 │   ├── features/
 │   │   ├── market_features.py      # 28 technical indicators + target computation
@@ -192,14 +192,17 @@ financial-market-predictor/
 │   │   ├── predict.py              # LivePredictor for inference
 │   │   └── evaluate.py             # Evaluation visualizations
 │   └── nlp/
-│       └── sentiment.py            # FinBERT + VADER sentiment pipeline
+│       ├── finbert_sentiment.py    # FinBERT sentiment pipeline
+│       ├── vader_sentiment.py      # VADER sentiment pipeline
+│       └── rag_chatbot.py          # Retrieval-augmented Q&A over news corpus
 ├── notebooks/
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_feature_engineering.ipynb
-│   ├── 03_nlp_sentiment.ipynb
-│   ├── 04_cv_embeddings.ipynb
-│   ├── 05_model_training.ipynb
-│   └── 06_streamlit_demo.ipynb
+│   ├── 01_eda.ipynb
+│   ├── 02_ml_baseline.ipynb
+│   ├── 03_nlp_pipeline.ipynb
+│   ├── 04_cv_pipeline.ipynb
+│   ├── 05_integrated_model.ipynb
+│   ├── 06_evaluation_ablation.ipynb
+│   └── 06_streamlit_app.ipynb
 ├── data/
 │   ├── raw/                        # Downloaded market data, news, charts
 │   └── processed/                  # Feature parquets, ablation results
@@ -257,10 +260,10 @@ pip install -r requirements.txt
 
 ```bash
 # 1. Download market data
-python -m src.data_collection.fetch_market_data
+python -m src.data_collection.market_collector
 
 # 2. Scrape news headlines
-python -m src.data_collection.scrape_ticker_news
+python -m src.data_collection.news_scraper
 
 # 3. Build market features (28 indicators + target)
 python -m src.features.market_features
@@ -283,6 +286,44 @@ python scripts/finetune_cnn.py --epochs 10
 # 9. Launch Streamlit app
 streamlit run app.py
 ```
+
+### A-E Compliance Checklist (Submission Gate)
+
+Use this section as the final hand-in checklist against the official requirements.
+
+| Requirement Area | Status | Evidence Location |
+|------------------|--------|-------------------|
+| A. At least two blocks combined | Done | This README (Architecture Overview), `src/models/train_ml.py` |
+| A. Meaningful technical integration | Done | `src/models/train_ml.py` (Config A/B/C shared training) |
+| A. Multiple different data sources | Done | `src/data_collection/market_collector.py`, `src/data_collection/news_scraper.py`, `src/data_collection/chart_generator.py` |
+| A. Realistic use case and motivation | Done | This README (Motivation & Background) |
+| A. Proper documentation | In progress | This README + notebooks + `UPGRADE_PLAN.md` |
+| B1. Project idea and methodology | Done | This README (Motivation, Architecture, Scope) |
+| B2. Data and preprocessing | Done | This README (Data Sources, Feature Summary) + feature modules |
+| B3. Modeling and implementation | Done | This README (Ablation, Overhaul) + `src/models/train_ml.py` |
+| B4. Evaluation and analysis | In progress | `notebooks/06_evaluation_ablation.ipynb`, `src/models/evaluate.py` |
+| B5. Deployment URL | Open | Add public URL below in Deployment Evidence |
+| B5. Train/inference separation | Done | `src/models/train_ml.py` vs `src/models/predict.py` |
+| B5. Screenshots | Open | Add screenshots list below in Deployment Evidence |
+| B6. Reproducible execution instructions | Done | This README (Setup & Reproduction) |
+| E.1 ML requirements | Done | EDA notebooks + model comparison + quantitative metrics |
+| E.2 NLP requirements | In progress | `src/nlp/*`, NLP feature pipeline, RAG chatbot |
+| E.3 CV requirements | Done | `src/cv/*`, chart generation, CV feature extraction |
+
+### Deployment Evidence
+
+- Public app URL: TODO
+- Public model/repo URL: TODO
+- Screenshot 1 (main prediction flow): TODO
+- Screenshot 2 (analysis/ablation view): TODO
+- Screenshot 3 (NLP/CV integration evidence in app): TODO
+
+### Submission Admin Checklist
+
+- [ ] Add collaborator `jasminh` on GitHub
+- [ ] Add collaborator `bkuehnis` on GitHub
+- [ ] Verify public repository link for submission
+- [ ] Freeze final tag before deadline
 
 ### Deployment (Streamlit Community Cloud / HuggingFace Spaces)
 
