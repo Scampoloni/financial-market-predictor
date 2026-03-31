@@ -18,6 +18,23 @@ Stock price prediction is a notoriously difficult problem — markets are noisy,
 
 The hypothesis is that each block captures a different "view" of the market, and an ensemble can exploit their complementarity through an **ablation study** (Configs A → B → C).
 
+## Scope, Assumptions, and Non-Goals
+
+### Scope
+- Predict 5-day direction (`UP`/`DOWN`) for a multi-sector S&P 500 subset.
+- Integrate three AI blocks in one unified pipeline: ML numeric features, NLP sentiment features, and CV chart embeddings.
+- Evaluate contribution of each block with controlled ablation (A/B/C).
+
+### Assumptions
+- Public daily OHLCV and headline data contain weak but exploitable directional signal at a 5-day horizon.
+- Temporal splits and time-series CV are required to avoid leakage and over-optimistic estimates.
+- Missing NLP/CV rows can be imputed to neutral defaults when source coverage is incomplete.
+
+### Non-Goals
+- No claim of tradable alpha after fees/slippage or live portfolio optimization.
+- No intraday/high-frequency forecasting.
+- No causal inference about market drivers.
+
 ---
 
 ## Architecture Overview
@@ -161,6 +178,22 @@ All models evaluated on a **held-out 2025 test set** (no data leakage). Training
 - **NLP delta is +0.0020** — small but positive. The sector/market fallback strategy provides meaningful coverage, giving a consistent incremental signal over technicals.
 - **CV delta is +0.0023** (B→C) — a significant achievement. Initially, using *frozen ImageNet weights* caused a performance regression. By **fine-tuning the EfficientNet-B0 CNN** specifically on the chart→direction labels (via `scripts/finetune_cnn.py`), the model learned to extract domain-specific visual patterns, making Config C the best-performing model overall.
 - **~0.50 F1 is a realistic ceiling** for 5-day stock prediction using public data — consistent with academic literature on the semi-strong form of the Efficient Market Hypothesis.
+
+### Block-Specific Evaluation Summary
+
+- **ML block:** Quantitative evaluation via TimeSeriesSplit cross-validation and held-out 2025 test performance (F1, accuracy, class report).
+- **NLP block:** Incremental contribution assessed via A→B delta, sentiment coverage/imputation diagnostics, and qualitative inspection of headline-driven periods.
+- **CV block:** Incremental contribution assessed via B→C delta and stability checks after CNN fine-tuning on chart-to-direction labels.
+
+### Error Analysis
+
+- **Regime sensitivity:** Performance degrades in abrupt volatility regime shifts (macro shocks) where historical patterns are less informative.
+- **Low-information days:** Days with sparse or generic headlines tend to produce weak NLP signal and increase uncertainty.
+- **Class ambiguity near zero return:** Observations close to 0% forward return behave like label-noise boundaries for binary direction.
+- **Sector heterogeneity:** Feature importance and error rates differ across sectors, indicating that one global decision boundary is imperfect.
+- **CV limitations:** Candlestick-only visual inputs cannot capture exogenous events and may overfit style artifacts without sufficient regularization.
+
+Mitigations implemented include temporal validation, fallback/imputation flags for NLP coverage, CNN fine-tuning for domain adaptation, and ablation-based contribution checks.
 
 ---
 

@@ -1,6 +1,16 @@
-"""Tests for data collection pipeline."""
+"""Smoke tests for data collection pipeline contracts."""
 
-# TODO: Implement tests in feature/data-pipeline branch
-# - yfinance returns correct OHLCV schema
-# - news scraper handles missing tickers gracefully
-# - chart generator produces valid PNG files
+from src import config
+
+
+def test_raw_data_directories_exist() -> None:
+	"""Raw data directories should be available in the repository layout."""
+	assert config.RAW_DIR.exists()
+	assert config.RAW_MARKET_DIR.exists()
+	assert config.RAW_NEWS_DIR.exists()
+	assert config.RAW_CHARTS_DIR.exists()
+
+
+def test_ticker_metadata_exists() -> None:
+	"""Ticker metadata file must exist for pipeline reproducibility."""
+	assert config.TICKERS_CSV_PATH.exists()
