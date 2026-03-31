@@ -274,6 +274,10 @@ FinBERT sentiment/confidence, VADER compound score, news volume (1d, 5d), headli
 
 ## Setup & Reproduction
 
+For submission execution and verification workflows, use:
+- `docs/AE_REQUIREMENTS_MATRIX.md` (requirement-by-requirement status)
+- `docs/FINAL_SUBMISSION_RUNBOOK.md` (step-by-step closure plan)
+
 ### Prerequisites
 - Python 3.11+
 - ~10 GB disk space (charts + embeddings)
