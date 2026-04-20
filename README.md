@@ -8,6 +8,14 @@ An end-to-end AI application that predicts **5-day stock price direction (UP/DOW
 
 ---
 
+## Screenshots
+
+| Prediction | Model Analysis | NLP + CV |
+|:---:|:---:|:---:|
+| ![Prediction](docs/screenshots/01_prediction_flow.png) | ![Model Analysis](docs/screenshots/02_model_analysis.png) | ![NLP + CV](docs/screenshots/03_nlp_cv_integration.png) |
+
+---
+
 ## What it does
 
 The system tests the hypothesis that combining three independent "views" of the market — technical indicators, language-based sentiment, and visual chart patterns — yields more robust predictions than any single modality alone. An ablation study (Configs A → B → C) quantifies each block's incremental contribution on a held-out 2025 test set.
