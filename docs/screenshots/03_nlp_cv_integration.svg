@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-  <rect width="1280" height="720" fill="#f4f6f8"/>
-  <rect x="40" y="40" width="1200" height="640" rx="16" fill="#ffffff" stroke="#c9d1d9"/>
-  <text x="80" y="120" font-family="Segoe UI, Arial, sans-serif" font-size="42" fill="#1f2937">Placeholder Screenshot</text>
-  <text x="80" y="180" font-family="Segoe UI, Arial, sans-serif" font-size="28" fill="#374151">03_nlp_cv_integration.svg</text>
-  <text x="80" y="240" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#4b5563">Replace with real Streamlit NLP/CV integration screenshot before submission.</text>
-</svg>
