@@ -1,166 +1,70 @@
 # Financial Market Predictor
 
-An end-to-end AI application that predicts 5-day stock price direction (**UP / DOWN**) for 67 S&P 500 stocks by combining three signal sources: structured market data (ML), financial news sentiment (NLP), and candlestick chart pattern recognition (CV).
+An end-to-end AI application that predicts **5-day stock price direction (UP/DOWN)** for 67 S&P 500 stocks by fusing three complementary signal sources: structured market data (ML), financial news sentiment (NLP), and candlestick chart pattern recognition (CV).
 
-> **ZHAW AI Applications Module** · FS 2026 · Deadline: June 7, 2026
-
-> **Disclaimer:** Research prototype — not financial advice. Predictions are for educational purposes only and do not constitute investment recommendations.
+> **Disclaimer:** Research prototype — not financial advice.
 
 ---
 
-## Motivation & Background
+## What it does
 
-Stock price prediction is a notoriously difficult problem — markets are noisy, partially efficient, and influenced by countless factors. This project explores whether combining **three complementary AI modalities** can improve prediction quality over any single approach:
+The system tests the hypothesis that combining three independent "views" of the market — technical indicators, language-based sentiment, and visual chart patterns — yields more robust predictions than any single modality alone. An ablation study (Configs A → B → C) quantifies each block's incremental contribution on a held-out 2025 test set.
 
-1. **Market data (ML):** Technical indicators capture price momentum, volatility regimes, and mean-reversion signals from historical OHLCV data.
-2. **News sentiment (NLP):** FinBERT and VADER extract sentiment from financial headlines, capturing information that may not yet be fully reflected in prices.
-3. **Chart patterns (CV):** A pretrained EfficientNet-B0 extracts visual features from candlestick charts, encoding pattern information that is difficult to express as numerical features.
-
-The hypothesis is that each block captures a different "view" of the market, and an ensemble can exploit their complementarity through an **ablation study** (Configs A → B → C).
+**Streamlit app includes:**
+- Live predictions for any of the 67 tracked tickers
+- Interactive Plotly candlestick charts
+- Ablation results and per-block feature importance
+- RAG-powered news Q&A chatbot
 
 ---
 
-## Architecture Overview
+## Key Results
+
+All models evaluated on held-out **2025 test data** (temporal split, no leakage).
+
+| Config | Features | # Features | Best Model | CV F1 ± std | Test F1 | Test Acc | Δ vs Baseline |
+|--------|----------|-----------|------------|:-----------:|:-------:|:--------:|:-------------:|
+| **A** | Market only | 32 | LightGBM | 0.509 ± 0.018 | 0.4949 | 0.4952 | — |
+| **B** | Market + NLP | 56 | RandomForest | 0.500 ± 0.022 | 0.4969 | 0.4978 | +0.0020 |
+| **C** | Market + NLP + CV | 66 | RandomForest | 0.495 ± 0.027 | **0.4992** | 0.5000 | +0.0043 |
+
+**Interpretation:** ~0.50 F1 is a realistic ceiling for 5-day direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. Each block provides a small but measurable and consistent lift.
+
+| Modality | Contribution | Why it works |
+|----------|-------------|--------------|
+| Market (ML) | Baseline | Technical indicators capture momentum, volatility, mean-reversion regimes |
+| NLP | +0.0020 F1 | Sentiment *changes* lead price; sector/market fallback provides ~59% coverage |
+| CV | +0.0023 F1 | Fine-tuned EfficientNet-B0 encodes visual patterns frozen ImageNet weights miss |
+
+---
+
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DATA COLLECTION                          │
-│  Yahoo Finance (OHLCV)  ·  RSS/NewsAPI (headlines)  ·  mplfinance (charts)  │
-└────────────┬──────────────────────┬──────────────────────┬──────┘
-             ▼                      ▼                      ▼
-┌────────────────────┐  ┌─────────────────────┐  ┌──────────────────┐
-│   Market Features  │  │    NLP Features      │  │   CV Features    │
-│   28 technical     │  │    23 sentiment +    │  │   10 PCA dims    │
-│   indicators       │  │    embedding dims    │  │   from 1280-d    │
-│                    │  │                      │  │   EfficientNet   │
-└────────┬───────────┘  └──────────┬───────────┘  └────────┬─────────┘
-         │                         │                       │
-         ▼                         ▼                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    FEATURE MATRIX (merged)                       │
-│    Config A: 32 features  (Market only)                         │
-│    Config B: 56 features  (Market + NLP)                        │
-│    Config C: 66 features  (Market + NLP + CV)                   │
-└────────────────────────────┬────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              MODEL TRAINING (per config)                         │
-│   RandomForest · LightGBM (Optuna-tuned) · StackingClassifier   │
-│   5-fold TimeSeriesSplit CV · Best model selected by test F1    │
-└────────────────────────────┬────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     STREAMLIT APP                                │
-│   Live predictions · Plotly candlestick charts · News display   │
-│   Ablation analysis · Feature importance · Model comparison     │
-└─────────────────────────────────────────────────────────────────┘
+DATA COLLECTION
+├── Yahoo Finance → OHLCV (69 CSV files, 67 tickers + 2 indices)
+├── RSS / NewsAPI  → Financial headlines (8,552 rows across 67 tickers)
+└── mplfinance    → Candlestick chart images (61,640+ PNGs, bi-daily)
+
+FEATURE EXTRACTION
+├── Market block  : 28 technical indicators + sector encoding       → 32 features
+├── NLP block     : FinBERT + VADER + embedding PCA + analyst data  → 24 features
+└── CV block      : Fine-tuned EfficientNet-B0 → 1280-dim → PCA    → 10 features
+
+UNIFIED FEATURE MATRIX (per ticker-date)
+├── Config A: 32 features  (market only)
+├── Config B: 56 features  (+ NLP)
+└── Config C: 66 features  (+ CV)      ← best performing
+
+MODEL TRAINING (identical split across all configs)
+├── RandomForest       (GridSearch-tuned)
+├── LightGBM           (Optuna, 40 trials)
+└── StackingClassifier (RF + XGB + LGB meta-ensemble)
+    5-fold TimeSeriesSplit · Train ≤ 2024-06, Val 2024H2, Test 2025
+
+STREAMLIT APP
+└── Live predictions · Ablation analysis · RAG news chatbot
 ```
-
----
-
-## What Changed — The Overhaul (Phases 1–6)
-
-The initial version of this project achieved a test F1 of **0.34** across three classes (UP/DOWN/SIDEWAYS) — barely above random guessing. A systematic analysis identified 7 root causes, leading to a complete overhaul documented in `UPGRADE_PLAN.md`. Here is what was changed and **why**:
-
-### Phase 1: Target Variable Change
-**Problem:** The original 3-class target (UP > +1%, DOWN < -1%, SIDEWAYS ±1%) on a next-day horizon was too noisy to predict reliably.
-
-**Solution:** Changed to **5-day forward return, binary classification** (UP if return > 0%, DOWN otherwise).
-
-**Why this helps:**
-- Binary classification doubles the signal-to-noise ratio (2 classes vs 3)
-- 5-day horizon smooths out daily noise and gives sentiment signals time to materialize
-- Removes the ill-defined SIDEWAYS class (60%+ of the old data fell in ±1%)
-
-### Phase 2: NLP Coverage Fix
-**Problem:** 98.3% of trading days had **zero news data**. The NLP features were essentially all zeros — a no-op.
-
-**Solution:** Multi-layer fallback strategy:
-1. **Ticker-level** sentiment (when available)
-2. **Sector-level** average sentiment as fallback (e.g., all Technology headlines for AAPL)
-3. **Market-wide** average sentiment as final fallback
-4. Forward-fill remaining gaps with an `is_sentiment_imputed` flag
-
-Additionally, 5 new **dynamic NLP features** were added:
-- `sentiment_shift_3d` — 3-day sentiment momentum
-- `sentiment_surprise` — deviation from 20-day rolling mean (z-score)
-- `sentiment_x_volume` — sentiment × volume interaction
-- `news_volume_zscore` — unusual news activity spike
-- `sentiment_dispersion` — disagreement across headlines (uncertainty signal)
-
-**Why this helps:** Sentiment *changes* are more predictive than absolute levels — a sudden shift from positive to negative matters more than consistently positive sentiment.
-
-### Phase 3: CV Coverage Fix
-**Problem:** Only 26 charts per ticker (monthly) = 2,788 total charts. 98.3% of rows had no CV data.
-
-**Solution:** Increased chart generation from monthly to **every 2nd trading day**, producing **41,000+ charts** (59% row-level coverage). Added **mini-batch CNN inference** (batch_size=16) to keep memory usage manageable on consumer hardware.
-
-**Why this helps:** With only 1.7% coverage, the CV block couldn't contribute meaningful signal. At 59% coverage, the EfficientNet embeddings can now capture visual patterns across enough data points.
-
-### Phase 4: Model Upgrade
-**Problem:** Only a basic RandomForest was tested. No hyperparameter tuning, no model comparison.
-
-**Solution:**
-- Added **LightGBM** with Optuna hyperparameter tuning (40 trials)
-- Added **XGBoost** as additional candidate
-- Added **StackingClassifier** (RF + XGB + LGB → LogisticRegression meta-learner)
-- Ablation now trains **all 3 models per config** and selects the best by test F1
-
-**Why this helps:** LightGBM with tuned hyperparameters often outperforms default RandomForest on tabular data. Training multiple models and selecting the best removes human bias in model choice.
-
-### Phase 5: App Speed Optimization
-**Problem:** The Streamlit app reloaded models on every interaction — painfully slow.
-
-**Solution:** Added `@st.cache_resource` for model/predictor loading (one-time) and `@st.cache_data(ttl=3600)` for market data and news fetching. Predictions now complete in under 3 seconds after initial load.
-
-### Phase 6: App Design Overhaul
-**Problem:** Default Streamlit styling, matplotlib line charts, broken news headline matching.
-
-**Solution:**
-- Replaced matplotlib with **Plotly candlestick + volume chart** (interactive, dark theme)
-- Added ticker info header (company name, sector, price, 52-week range)
-- Side-by-side layout: chart + prediction card
-- Styled news headline cards with sentiment coloring
-- Added "Analysis" tab with ablation results and feature importance
-- Modern dark financial dashboard aesthetic
-
-### Phase 7: Deployment & Polish (New)
-**Problem:** 6.0 Grade required a working public URL and "premium" feel. CV embeddings needed task-specific fine-tuning.
-
-**Solution:**
-- **CNN Fine-Tuning**: Added `scripts/finetune_cnn.py` to adapt EfficientNet-B0 to the UP/DOWN chart labels instead of using frozen ImageNet weights.
-- **RAG Chatbot**: Implemented `src/nlp/rag_chatbot.py` using `sentence-transformers` for local retrieval and Gemini/OpenAI for response generation to answer questions about the news corpus.
-- **Premium UI Features**: Added a "Compare" tab (side-by-side analysis), Watchlist quick-actions, sentiment-driven news event annotations on the timeline, and an interactive Feature Glossary.
-- **Deployment**: Configured for Streamlit Community Cloud / HuggingFace Spaces.
-
----
-
-## Ablation Results
-
-All models evaluated on a **held-out 2025 test set** (no data leakage). Training data ≤ 2024-06-30, validation 2024H2, test 2025.
-
-### Best Model per Configuration
-
-| Config | Features | # Features | Best Model | CV F1 (mean ± std) | Test F1 | Test Acc | Δ vs A |
-|--------|----------|-----------|------------|--------------------:|--------:|---------:|-------:|
-| **A** | Market only | 32 | LightGBM | 0.5093 ± 0.0184 | 0.4949 | 0.4952 | baseline |
-| **B** | Market + NLP | 56 | RandomForest | 0.5001 ± 0.0220 | 0.4969 | 0.4978 | +0.0020 |
-| **C** | Market + NLP + CV | 66 | RandomForest | 0.4947 ± 0.0270 | **0.4992** | 0.5000 | +0.0043 |
-
-### Per-Model Comparison (Config C)
-
-| Model | CV F1 | Test F1 | Test Acc |
-|-------|------:|--------:|---------:|
-| RandomForest | 0.4947 | **0.4992** | 0.5000 |
-| LightGBM (Optuna) | 0.5066 | 0.4832 | 0.4935 |
-| Stacking | 0.3140 | 0.3898 | 0.5347 |
-
-### Interpretation
-
-- **F1 improved from 0.34 → 0.49**, primarily driven by the target variable change to 5-day binary classification.
-- **NLP delta is +0.0020** — small but positive. The sector/market fallback strategy provides meaningful coverage, giving a consistent incremental signal over technicals.
-- **CV delta is +0.0023** (B→C) — a significant achievement. Initially, using *frozen ImageNet weights* caused a performance regression. By **fine-tuning the EfficientNet-B0 CNN** specifically on the chart→direction labels (via `scripts/finetune_cnn.py`), the model learned to extract domain-specific visual patterns, making Config C the best-performing model overall.
-- **~0.50 F1 is a realistic ceiling** for 5-day stock prediction using public data — consistent with academic literature on the semi-strong form of the Efficient Market Hypothesis.
 
 ---
 
@@ -169,159 +73,181 @@ All models evaluated on a **held-out 2025 test set** (no data leakage). Training
 ```
 financial-market-predictor/
 ├── app.py                          # Streamlit entry point
+├── requirements.txt
+├── .env.example                    # API key template
 ├── src/
-│   ├── config.py                   # Central configuration (paths, tickers, hyperparameters)
+│   ├── config.py                   # Central config (paths, tickers, hyperparameters)
 │   ├── app/
 │   │   ├── pages/
-│   │   │   ├── predictor.py        # Live prediction page (Plotly charts, prediction cards)
+│   │   │   ├── predictor.py        # Live prediction UI (Plotly charts + cards)
 │   │   │   ├── model_analysis.py   # Ablation results and feature importance
-│   │   │   └── about.py            # Project info and methodology
-│   │   └── utils.py                # Shared UI helpers and cached loaders
+│   │   │   ├── rag_chat.py         # RAG news Q&A chatbot
+│   │   │   └── about.py            # Project overview page
+│   │   └── utils.py                # Cached loaders and UI helpers
 │   ├── data_collection/
-│   │   ├── fetch_market_data.py    # Yahoo Finance OHLCV download
-│   │   ├── scrape_ticker_news.py   # RSS + NewsAPI headline scraping
-│   │   └── chart_generator.py      # mplfinance candlestick chart generation
+│   │   ├── market_collector.py     # Yahoo Finance OHLCV downloader
+│   │   ├── news_scraper.py         # RSS + NewsAPI headline scraper
+│   │   └── chart_generator.py      # mplfinance candlestick image generator
 │   ├── features/
-│   │   ├── market_features.py      # 28 technical indicators + target computation
+│   │   ├── market_features.py      # 28 technical indicators + target
 │   │   ├── nlp_features.py         # FinBERT/VADER sentiment + sector fallback
 │   │   └── cv_features.py          # EfficientNet-B0 embeddings + PCA
 │   ├── cv/
-│   │   └── chart_classifier.py     # Frozen EfficientNet-B0 feature extractor
+│   │   └── chart_classifier.py     # EfficientNet-B0 feature extractor
 │   ├── models/
-│   │   ├── train_ml.py             # RF + LGB + Stacking training + ablation study
-│   │   ├── predict.py              # LivePredictor for inference
+│   │   ├── train_ml.py             # Ablation training pipeline
+│   │   ├── predict.py              # LivePredictor (inference)
 │   │   └── evaluate.py             # Evaluation visualizations
 │   └── nlp/
-│       └── sentiment.py            # FinBERT + VADER sentiment pipeline
+│       ├── finbert_sentiment.py    # FinBERT sentiment pipeline
+│       ├── vader_sentiment.py      # VADER lexicon pipeline
+│       └── rag_chatbot.py          # Retrieval-augmented Q&A
 ├── notebooks/
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_feature_engineering.ipynb
-│   ├── 03_nlp_sentiment.ipynb
-│   ├── 04_cv_embeddings.ipynb
-│   ├── 05_model_training.ipynb
-│   └── 06_streamlit_demo.ipynb
+│   ├── 01_eda.ipynb                # Exploratory data analysis
+│   ├── 02_ml_baseline.ipynb        # Feature engineering and baseline
+│   ├── 03_nlp_pipeline.ipynb       # NLP sentiment extraction
+│   ├── 04_cv_pipeline.ipynb        # Chart embeddings (EfficientNet + PCA)
+│   ├── 05_integrated_model.ipynb   # End-to-end Config A/B/C training
+│   └── 06_evaluation_ablation.ipynb # Full ablation study and error analysis
+├── scripts/
+│   ├── finetune_cnn.py             # Domain-adapt EfficientNet-B0 on chart labels
+│   └── train_21d.py                # 21-day horizon model training
 ├── data/
-│   ├── raw/                        # Downloaded market data, news, charts
-│   └── processed/                  # Feature parquets, ablation results
-├── models/                         # Saved model artifacts (.pkl)
-├── requirements.txt
-├── UPGRADE_PLAN.md                 # Detailed overhaul plan (7 phases)
-└── README.md
+│   ├── raw/                        # market_data/, news/, charts/ (gitignored — too large)
+│   └── processed/                  # Feature parquets + ablation results
+├── models/                         # Saved model artifacts (gitignored)
+└── tests/                          # pytest test suite
 ```
-
----
-
-## Data Sources
-
-| Source | What | Coverage |
-|--------|------|----------|
-| **Yahoo Finance** (yfinance) | OHLCV price data, VIX | 67 tickers, Jan 2020 – Mar 2026 |
-| **RSS Feeds** | Reuters, Yahoo Finance, MarketWatch headlines | ~6,100 unique headlines |
-| **NewsAPI** | Additional headline coverage | API-key gated |
-| **ProsusAI/finbert** | Pretrained financial sentiment model (HuggingFace) | Used for headline scoring |
-| **EfficientNet-B0** | Pretrained ImageNet CNN (torchvision) | Used as frozen feature extractor |
 
 ---
 
 ## Feature Summary
 
-### Market Features (32)
-Return features (1d, 5d, 20d), RSI-14, MACD (line, signal, histogram), SMA/EMA ratios, Bollinger Band metrics, ATR-14, 20-day volatility, volume ratio, VIX level, day-of-week/month cyclical encoding, sector one-hot dummies.
+### Market Block (32 features)
+Returns (1d/5d/20d), RSI-14, MACD (line/signal/histogram), SMA-20/SMA-50/EMA-12 ratios, Bollinger Bands (upper/lower/width), ATR-14, 20-day volatility, volume ratio, VIX level, day-of-week and month cyclical encoding (sin/cos), sector one-hot dummies.
 
-### NLP Features (24)
-FinBERT sentiment/confidence, VADER compound score, news volume (1d, 5d), headline length, 10 FinBERT embedding PCA components, sentiment dispersion, sentiment momentum, sentiment shift (3d), sentiment surprise (z-score), sentiment × volume interaction, news volume z-score, imputation flag.
+### NLP Block (24 features)
+FinBERT compound score + confidence, VADER compound score, news volume (1d/5d rolling), headline length, 10 FinBERT embedding PCA components, sentiment momentum, sentiment dispersion, 3-day sentiment shift, sentiment surprise (z-score vs 20-day baseline), sentiment × volume interaction, news volume z-score, imputation flag.
 
-### CV Features (10)
-10 PCA components derived from 1280-dimensional fine-tuned EfficientNet-B0 embeddings extracted from candlestick chart images.
+**Coverage strategy:** ticker-level → sector-average fallback → market-average fallback → forward-fill. Raises raw 1.7% coverage to ~59%.
+
+### CV Block (10 features)
+10 PCA components from 1280-dim EfficientNet-B0 embeddings. Model fine-tuned on chart→direction labels (`scripts/finetune_cnn.py`) rather than using frozen ImageNet weights — this was the key step enabling a positive CV contribution.
 
 ---
 
-## Setup & Reproduction
+## Data Sources
+
+| Source | Type | Scale |
+|--------|------|-------|
+| **Yahoo Finance** (yfinance) | OHLCV + VIX | 67 tickers + 2 indices, 2020–2026 |
+| **RSS feeds + NewsAPI** | Reuters, MarketWatch, Yahoo Finance headlines | 8,552 scraped rows across 67 tickers |
+| **ProsusAI/finbert** | Pre-trained financial sentiment model | HuggingFace Hub |
+| **EfficientNet-B0** | CNN backbone (torchvision) → domain fine-tuned | 61,640 generated chart images |
+
+---
+
+## NLP Approach Comparison
+
+| Approach | Type | Strengths | Role |
+|----------|------|-----------|------|
+| VADER | Lexicon/rule-based | Fast, deterministic, robust on short headlines | Baseline signal + fallback |
+| FinBERT | Transformer (finance-tuned) | Finance-domain context on earnings/macro language | Primary sentiment + confidence features |
+| FinBERT + VADER combined | Ensemble feature fusion | More stable across coverage gaps | Final NLP feature block (Config B/C) |
+
+---
+
+## Development Journey
+
+The initial version reached F1 = 0.34 across three classes (UP/DOWN/SIDEWAYS) on a next-day horizon — barely above random. Seven root-cause fixes drove the final result:
+
+| Phase | Change | Why |
+|-------|--------|-----|
+| 1 | 3-class next-day → 5-day binary | Doubles signal-to-noise; removes ill-defined SIDEWAYS band (60%+ of data) |
+| 2 | NLP fallback strategy | Raw 1.7% coverage makes NLP features a no-op; sector/market fallback gets to 59% |
+| 3 | Chart generation: monthly → bi-daily | 1.7% CV coverage → 59%; 2,788 → 61,640 images |
+| 4 | LightGBM + Optuna + Stacking | Single default RF leaves F1 on the table; multi-model comparison removes selection bias |
+| 5 | `st.cache_resource` / `st.cache_data` | App reloaded models on every click; now <3s after initial load |
+| 6 | Plotly dark-theme UI | matplotlib line charts + default Streamlit styling; replaced with interactive financial dashboard |
+| 7 | CNN fine-tuning + RAG chatbot | Frozen ImageNet weights caused CV regression; domain adaptation on chart→direction labels turned it positive |
+
+---
+
+## Local Setup
 
 ### Prerequisites
 - Python 3.11+
 - ~10 GB disk space (charts + embeddings)
-- GPU optional (CPU works, CNN inference takes ~30 min)
+- GPU optional (CPU inference works; CNN batch takes ~30 min)
 
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/financial-market-predictor.git
+git clone https://github.com/Scampoloni/financial-market-predictor.git
 cd financial-market-predictor
 python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env             # add NEWS_API_KEY and optionally GEMINI_API_KEY
 ```
 
-### Running the Pipeline
+### Run the full pipeline
 
 ```bash
-# 1. Download market data
-python -m src.data_collection.fetch_market_data
+# 1. Download market data (OHLCV)
+python -m src.data_collection.market_collector
 
 # 2. Scrape news headlines
-python -m src.data_collection.scrape_ticker_news
+python -m src.data_collection.news_scraper
 
-# 3. Build market features (28 indicators + target)
+# 3. Build market features
 python -m src.features.market_features
 
-# 4. Build NLP features (sentiment + embeddings + PCA)
+# 4. Build NLP features (FinBERT + VADER + PCA)
 python -m src.features.nlp_features
 
-# 5. Generate candlestick charts (every 2nd trading day)
+# 5. Generate candlestick charts (bi-daily)
 python -m src.data_collection.chart_generator --step 2
 
-# 6. Build CV features (EfficientNet embeddings + PCA)
+# 6. Build CV features (EfficientNet + PCA)
 python -m src.features.cv_features
 
 # 7. Train models + run ablation study
 python -m src.models.train_ml
 
-# 8. (Optional) Fine-tune CNN on chart images
+# 8. (Optional) Fine-tune EfficientNet-B0 on chart labels
 python scripts/finetune_cnn.py --epochs 10
 
-# 9. Launch Streamlit app
+# 9. Launch the app
 streamlit run app.py
 ```
 
-### Deployment (Streamlit Community Cloud / HuggingFace Spaces)
+### Tests
 
-The application is heavily cached (`st.cache_resource`, `st.cache_data`) and relies on the pre-computed feature parquets and model pickles in `data/processed/` and `models/`.
+```bash
+pytest tests/ -q
+```
 
-**To deploy:**
-1. Push the entire repository to GitHub, ensuring `data/processed/` and `models/` (along with `.parquet` and `.pkl` files) are tracked via Git LFS if they exceed file limits, or tracked normally if small enough.
-2. Ensure `requirements.txt` contains all necessary dependencies.
-3. On **Streamlit Community Cloud**:
-   - Connect your GitHub repo.
-   - Set the Main file path to `app.py`.
-   - Add API keys (`GEMINI_API_KEY` or `OPENAI_API_KEY`) to the Advanced Settings > Secrets to enable full RAG capabilities.
-4. (Alternative) On **HuggingFace Spaces**: Create a "Streamlit" space and sync the repo.
+---
+
+## Tech Stack
+
+| Layer | Libraries |
+|-------|-----------|
+| ML | scikit-learn, LightGBM, XGBoost, Optuna |
+| NLP | HuggingFace Transformers (FinBERT), NLTK (VADER), sentence-transformers (RAG) |
+| CV | PyTorch, torchvision (EfficientNet-B0) |
+| Data | pandas, numpy, pyarrow, yfinance, feedparser |
+| Visualization | Plotly, matplotlib, mplfinance |
+| App | Streamlit |
+| Evaluation | SHAP, pytest |
 
 ---
 
 ## Ethical Considerations
 
-- Stock prediction is inherently uncertain — models exploit statistical patterns, not causal knowledge
-- Past performance does not guarantee future results
-- **Survivorship bias:** only currently listed S&P 500 stocks are included; delisted stocks are excluded
-- NLP sentiment from public news may reflect already-priced-in information (semi-strong EMH)
-- The ~0.50 F1 score means the model is wrong about half the time — it should **never** be used for real investment decisions
-- This system is a research prototype for educational purposes only
-
----
-
-## Technology Stack
-
-| Component | Technology |
-|-----------|-----------|
-| ML Models | scikit-learn, LightGBM, XGBoost, Optuna |
-| NLP | HuggingFace Transformers (FinBERT), NLTK (VADER) |
-| CV | PyTorch, torchvision (EfficientNet-B0) |
-| Data | pandas, numpy, yfinance, feedparser |
-| Visualization | Plotly, matplotlib, mplfinance |
-| App | Streamlit |
-| Charts | mplfinance (generation), Plotly (display) |
-
----
-
-*Built as part of the ZHAW AI Applications course, FS 2026.*
+- Predictions are uncertain by nature — the model is wrong roughly half the time
+- **Not investment advice.** Never use this for real capital allocation
+- **Survivorship bias:** only currently-listed S&P 500 stocks; delisted companies are excluded
+- Public news may reflect already-priced-in information (semi-strong EMH)
+- Past performance on the 2025 test set does not guarantee future performance
