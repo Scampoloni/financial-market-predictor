@@ -38,13 +38,24 @@ All models evaluated on held-out **2025 test data** (temporal split, no leakage)
 | **B** | Market + NLP | 56 | RandomForest | 0.500 ± 0.022 | 0.4969 | 0.4978 | +0.0020 |
 | **C** | Market + NLP + CV | 66 | RandomForest | 0.495 ± 0.027 | **0.4992** | 0.5000 | +0.0043 |
 
-**Interpretation:** ~0.50 F1 is a realistic ceiling for 5-day direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. Each block provides a small but measurable and consistent lift.
+**Interpretation:** ~0.50 F1 is a realistic ceiling for direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. Each block provides a small but measurable and consistent lift.
 
 | Modality | Contribution | Why it works |
 |----------|-------------|--------------|
 | Market (ML) | Baseline | Technical indicators capture momentum, volatility, mean-reversion regimes |
 | NLP | +0.0020 F1 | Sentiment *changes* lead price; sector/market fallback provides ~59% coverage |
 | CV | +0.0023 F1 | Fine-tuned EfficientNet-B0 encodes visual patterns frozen ImageNet weights miss |
+
+### Multi-Horizon Comparison
+
+The app also supports a **21-day prediction horizon** (Config C equivalent, 61 features), evaluated on the same held-out 2025 test set:
+
+| Horizon | Features | Test F1 | Test Acc | Test Rows |
+|---------|----------|:-------:|:--------:|:---------:|
+| **5-day** | 66 (Config C) | **0.4992** | 0.5000 | 16,348 |
+| **21-day** | 61 (Config C) | 0.4961 | 0.4989 | 18,961 |
+
+**Finding:** The EMH ceiling (~0.50 F1) holds consistently across both prediction horizons, confirming that the signal limitation is structural rather than specific to the 5-day window. The 21-day model offers slightly higher recall on DOWN predictions (0.65 vs 0.59), suggesting chart patterns carry more signal over longer windows.
 
 ---
 
