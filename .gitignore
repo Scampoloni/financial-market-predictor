@@ -27,9 +27,9 @@ ENV/
 # Data (raw data not tracked — too large)
 data/raw/
 
-# Model artifacts
-models/*.pkl
-models/*.pth
+# Model artifacts — committed directly (all files <50 MB)
+# models/*.pkl
+# models/*.pth
 
 # IDE
 .vscode/

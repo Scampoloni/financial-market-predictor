@@ -1005,8 +1005,10 @@ def render_compare() -> None:
         horizons = p.available_horizons
         horizon_labels = {5: "5-Day", 21: "21-Day"}
         opts = [horizon_labels.get(h, f"{h}-Day") for h in horizons]
-        sel = st.selectbox("Horizon", opts, label_visibility="collapsed", key="cmp_h")
-        selected_h = horizons[opts.index(sel)]
+        cached = st.session_state.get("cmp_h")
+        default_idx = opts.index(cached) if cached in opts else 0
+        sel = st.selectbox("Horizon", opts, index=default_idx, label_visibility="collapsed", key="cmp_h")
+        selected_h = horizons[opts.index(sel)] if opts else 5
     with col_run:
         run_cmp = st.button("Compare", type="primary", use_container_width=True, key="cmp_run")
 
