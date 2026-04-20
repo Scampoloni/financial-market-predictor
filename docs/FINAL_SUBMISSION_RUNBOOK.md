@@ -2,6 +2,14 @@
 
 Purpose: Close every remaining requirement with concrete evidence before final hand-in.
 
+## Current Closure Status (2026-03-31)
+
+- WP-01 Documentation Backbone: Completed (repo-side)
+- WP-02 Evaluation Hardening: Completed (repo-side)
+- WP-03 Deployment Evidence: In progress (external publish URL and real screenshots pending)
+- WP-04 Reproducibility and QA: Completed (smoke tests passing)
+- WP-05 Submission Gate: In progress (GitHub collaborator and visibility confirmation pending)
+
 ## 1) Working Mode
 
 - Use one branch for compliance hardening: `feat/a-e-compliance-implementation`.
@@ -71,7 +79,8 @@ Deliverables:
 - Add short "known limitations" section for grading transparency.
 
 Validation:
-- `python -m pytest tests/test_data_pipeline.py tests/test_feature_engineering.py tests/test_ml_pipeline.py tests/test_streamlit.py -q`
+- `pytest tests/test_data_pipeline.py tests/test_feature_engineering.py tests/test_ml_pipeline.py tests/test_streamlit.py -q`
+- Last local run: `8 passed` (2026-03-31)
 
 Evidence update:
 - Matrix row B6 set to Done.
@@ -109,11 +118,11 @@ Must exist before submission:
 
 ## 6) Final Pre-Submission Checklist
 
-- [ ] A: all general requirements explicitly evidenced
-- [ ] B1-B6: all mandatory documentation items present
-- [ ] C: clarity, correctness, depth, integration, reproducibility addressed
-- [ ] D: collaborators confirmed and GitHub link ready
-- [ ] E: combined blocks integrated and block-specific requirements evidenced
-- [ ] README commands tested and valid
+- [x] A: all general requirements explicitly evidenced
+- [x] B1-B6: all mandatory documentation items present (repo-side)
+- [x] C: clarity, correctness, depth, integration, reproducibility addressed (repo-side)
+- [ ] D: collaborators confirmed and GitHub link ready (external)
+- [x] E: combined blocks integrated and block-specific requirements evidenced
+- [x] README commands tested and valid
 - [ ] Deployment URL works publicly
-- [ ] Screenshots linked and visible in README
+- [ ] Screenshots linked and visible in README (real captures replacing placeholders)
