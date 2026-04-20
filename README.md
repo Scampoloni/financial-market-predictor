@@ -4,6 +4,8 @@ An end-to-end AI application that predicts **5-day stock price direction (UP/DOW
 
 > **Disclaimer:** Research prototype — not financial advice.
 
+**Live Demo:** [financial-market-predictorr.streamlit.app](https://financial-market-predictorr.streamlit.app/)
+
 ---
 
 ## What it does
