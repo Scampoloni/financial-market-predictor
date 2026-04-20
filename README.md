@@ -125,7 +125,7 @@ financial-market-predictor/
 ├── data/
 │   ├── raw/                        # market_data/, news/, charts/ (gitignored — too large)
 │   └── processed/                  # Feature parquets + ablation results
-├── models/                         # Saved model artifacts (gitignored)
+├── models/                         # Saved model artifacts (pkl + pth, tracked in git)
 └── tests/                          # pytest test suite
 ```
 

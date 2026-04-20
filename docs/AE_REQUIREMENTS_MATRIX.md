@@ -10,7 +10,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Meaningful conceptual and technical integration | Done | Shared feature matrix and Config A/B/C ablation in `src/models/train_ml.py`, integration narrative in `README.md` | None |
 | Multiple and different data sources | Done | `src/data_collection/market_collector.py`, `src/data_collection/news_scraper.py`, `src/data_collection/chart_generator.py`, source-size table in `README.md` | None |
 | Well-motivated and realistic use case | Done | Motivation + assumptions/non-goals in `README.md` | None |
-| Independently completed and documented | Done (repo-side) | `README.md`, notebooks, `UPGRADE_PLAN.md`, `docs/FINAL_SUBMISSION_RUNBOOK.md` | External deployment publication still required |
+| Independently completed and documented | Done | `README.md`, notebooks, `docs/FINAL_SUBMISSION_RUNBOOK.md`, live deployment at https://financial-market-predictorr.streamlit.app/ | None |
 
 ## B. Documentation Requirements
 
@@ -52,9 +52,9 @@ This matrix is the operational checklist for reaching full compliance with the Z
 ### B5. Deployment
 | Requirement | Status | Evidence | Remaining Action |
 |---|---|---|---|
-| Working deployment URL | External | Deployment section in `README.md` and runbook contain publish steps | Publish app and insert URL |
+| Working deployment URL | Done | https://financial-market-predictorr.streamlit.app/ | None |
 | Separation training vs inference | Done | `src/models/train_ml.py` vs `src/models/predict.py` | None |
-| Screenshots for key functionality | In progress | `docs/screenshots/` placeholders + links in `README.md` | Replace placeholders with real captures from deployed app |
+| Screenshots for key functionality | Done | `docs/screenshots/` — 3 real PNG captures in `README.md` | None |
 
 ### B6. Execution Instructions
 | Requirement | Status | Evidence | Remaining Action |
@@ -69,14 +69,14 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Technical correctness | High | Pipelines and module separation + smoke tests in `tests/` | None |
 | Depth of analysis | High | Ablation + interpretation + explicit error analysis | None |
 | Quality of integration | High | Shared A/B/C pipeline + integration narrative | None |
-| Reproducibility | Medium-High | Setup instructions + smoke tests + screenshot scaffold | Add public URL and real screenshot captures |
+| Reproducibility | High | Setup instructions + smoke tests + real screenshots + live deployment URL | None |
 
 ## D. Submission
 
 | Requirement | Status | Evidence | Remaining Action |
 |---|---|---|---|
-| Submit GitHub link by deadline | In progress (external) | Repository exists | Final submission upload/URL confirmation |
-| Add `jasminh` and `bkuehnis` | External | Not verifiable in code | Add collaborators on GitHub and confirm |
+| Submit GitHub link by deadline | In progress | Repository at https://github.com/Scampoloni/financial-market-predictor | Submit link by 07 June 2026, 18:00 |
+| Add `jasminh` and `bkuehnis` | Pending | — | Add both as collaborators on GitHub (Settings → Collaborators) |
 
 ## E. Specific Block Requirements
 
@@ -118,9 +118,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Behavior limitations interpreted | Done | Dedicated limitations bullets in `README.md` (Error Analysis) |
 | Integration contribution to another block | Done | CV features in Config C | None |
 
-## Execution Order for Remaining Work
+## Remaining Actions
 
-1. Publish app publicly and insert final deployment URL in `README.md`.
-2. Replace screenshot placeholder SVGs with real app captures in `docs/screenshots/`.
-3. Confirm GitHub collaborators (`jasminh`, `bkuehnis`) and submission URL.
-4. Run final consistency check (commands, names, links) and tag release candidate.
+1. Add GitHub collaborators `jasminh` and `bkuehnis` (Settings → Collaborators).
+2. Submit GitHub link by 07 June 2026, 18:00.
