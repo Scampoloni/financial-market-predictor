@@ -112,12 +112,12 @@ financial-market-predictor/
 │       ├── finbert_sentiment.py    # FinBERT sentiment pipeline
 │       ├── vader_sentiment.py      # VADER lexicon pipeline
 │       └── rag_chatbot.py          # Retrieval-augmented Q&A
-├── notebooks/
+├── notebooks/                      # Development records (v1 exploratory phase)
 │   ├── 01_eda.ipynb                # Exploratory data analysis
-│   ├── 02_ml_baseline.ipynb        # Feature engineering and baseline
+│   ├── 02_ml_baseline.ipynb        # Feature engineering and baseline (3-class, 28 features)
 │   ├── 03_nlp_pipeline.ipynb       # NLP sentiment extraction
 │   ├── 04_cv_pipeline.ipynb        # Chart embeddings (EfficientNet + PCA)
-│   ├── 05_integrated_model.ipynb   # End-to-end Config A/B/C training
+│   ├── 05_integrated_model.ipynb   # End-to-end Config A/B/C training (3-class)
 │   └── 06_evaluation_ablation.ipynb # Full ablation study and error analysis
 ├── scripts/
 │   ├── finetune_cnn.py             # Domain-adapt EfficientNet-B0 on chart labels
@@ -180,6 +180,12 @@ The initial version reached F1 = 0.34 across three classes (UP/DOWN/SIDEWAYS) on
 | 5 | `st.cache_resource` / `st.cache_data` | App reloaded models on every click; now <3s after initial load |
 | 6 | Plotly dark-theme UI | matplotlib line charts + default Streamlit styling; replaced with interactive financial dashboard |
 | 7 | CNN fine-tuning + RAG chatbot | Frozen ImageNet weights caused CV regression; domain adaptation on chart→direction labels turned it positive |
+
+---
+
+## Notebook vs. Production Pipeline
+
+The notebooks (`01`–`06`) document the **iterative development process** and contain saved outputs from the exploratory phase (v1: 3-class UP/DOWN/SIDEWAYS, 28 features, F1≈0.34). The production pipeline in `src/` implements the final version (v2: binary UP/DOWN, 32–66 features depending on config, F1≈0.50). The key changes are captured in the [Development Journey](#development-journey) section above. Both versions are intentionally preserved to show the full research arc.
 
 ---
 
