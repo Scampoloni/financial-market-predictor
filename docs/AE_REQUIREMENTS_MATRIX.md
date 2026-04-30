@@ -34,7 +34,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 ### B3. Modeling and Implementation
 | Requirement | Status | Evidence | Remaining Action |
 |---|---|---|---|
-| Model/prompt selection justified | Done | README + model training code | None |
+| Model/prompt selection justified | Done | README (validation-based selection note) + `src/models/train_ml.py` | None |
 | Training/finetuning strategy | Done | `src/models/train_ml.py`, `scripts/finetune_cnn.py` | None |
 | Model/prompt approach comparison | Done | Ablation and model comparisons | Ensure one concise summary table in README |
 | Iterations and improvements | Done | `UPGRADE_PLAN.md`, README phases | None |
@@ -47,7 +47,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Performance analysis | Done | Ablation results in README/notebook | None |
 | Error analysis | Done | Explicit error analysis section in `README.md` | None |
 | Interpretation of results | Done | README interpretation subsection | None |
-| Block-specific evaluation | Done | Block-specific evaluation bullets in `README.md` + notebooks/modules | None |
+| Block-specific evaluation | Done | CV isolated eval in `notebooks/04_cv_pipeline.ipynb` (Section 7) + `README.md` | None |
 
 ### B5. Deployment
 | Requirement | Status | Evidence | Remaining Action |
@@ -114,7 +114,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Image data used | Done | `data/raw/charts/` + generator | None |
 | Image preprocessing/augmentation | Done | chart generation + CV feature extraction | None |
 | Vision model training/finetuning/application | Done | `src/cv/chart_classifier.py`, `scripts/finetune_cnn.py` | None |
-| Evaluation by metrics/visual inspection | Done | CV pipeline + ablation impact + dedicated CV notes in `README.md` |
+| Evaluation by metrics/visual inspection | Done | `notebooks/04_cv_pipeline.ipynb` (Section 7 confusion matrix + visual inspection) + `README.md` |
 | Behavior limitations interpreted | Done | Dedicated limitations bullets in `README.md` (Error Analysis) |
 | Integration contribution to another block | Done | CV features in Config C | None |
 

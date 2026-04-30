@@ -299,24 +299,42 @@ def train_stacking(
 # Evaluation
 # ──────────────────────────────────────────────────────────────────────────────
 
-def evaluate_model(model, X_test: pd.DataFrame, y_test: pd.Series) -> dict:
-    """Return test-set metrics dict."""
-    y_pred = model.predict(X_test)
-    f1  = float(f1_score(y_test, y_pred, average="macro"))
-    acc = float(accuracy_score(y_test, y_pred))
-    report = classification_report(y_test, y_pred, labels=TARGET_CLASSES, output_dict=True)
-    return {
-        "test_f1_macro": f1,
-        "test_accuracy": acc,
-        "per_class": {
+def evaluate_model(
+    model,
+    X: pd.DataFrame,
+    y: pd.Series,
+    prefix: str = "test",
+    include_report: bool = False,
+) -> dict:
+    """Return metrics dict for a given split.
+
+    Args:
+        model: Fitted model.
+        X: Feature matrix.
+        y: Labels.
+        prefix: Metric prefix (e.g., 'val' or 'test').
+        include_report: If True, include per-class metrics.
+    """
+    y_pred = model.predict(X)
+    f1 = float(f1_score(y, y_pred, average="macro"))
+    acc = float(accuracy_score(y, y_pred))
+    result = {
+        f"{prefix}_f1_macro": f1,
+        f"{prefix}_accuracy": acc,
+    }
+
+    if include_report:
+        report = classification_report(y, y_pred, labels=TARGET_CLASSES, output_dict=True)
+        result["per_class"] = {
             cls: {
                 "precision": round(report[cls]["precision"], 4),
                 "recall":    round(report[cls]["recall"], 4),
                 "f1":        round(report[cls]["f1-score"], 4),
             }
             for cls in TARGET_CLASSES
-        },
-    }
+        }
+
+    return result
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -357,29 +375,32 @@ def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
         # 1) RandomForest
         logger.info("Config %s: training RandomForest ...", config)
         rf_model, rf_cv = train_random_forest(X_train, y_train, tscv)
-        rf_test = evaluate_model(rf_model, X_test, y_test)
-        model_results["RandomForest"] = {**rf_cv, **rf_test, "_model": rf_model}
-        logger.info("  RF — CV F1: %.4f | Test F1: %.4f", rf_cv["cv_f1_mean"], rf_test["test_f1_macro"])
+        rf_val = evaluate_model(rf_model, X_val, y_val, prefix="val")
+        model_results["RandomForest"] = {**rf_cv, **rf_val, "_model": rf_model}
+        logger.info("  RF — CV F1: %.4f | Val F1: %.4f", rf_cv["cv_f1_mean"], rf_val["val_f1_macro"])
 
         # 2) LightGBM (Optuna-tuned)
         logger.info("Config %s: training LightGBM (Optuna) ...", config)
         lgb_model, lgb_cv = train_lightgbm(X_train, y_train, tscv, n_trials=40)
-        lgb_test = evaluate_model(lgb_model, X_test, y_test)
+        lgb_val = evaluate_model(lgb_model, X_val, y_val, prefix="val")
         lgb_params = lgb_cv.pop("best_params", {})
-        model_results["LightGBM"] = {**lgb_cv, **lgb_test, "_model": lgb_model}
-        logger.info("  LGB — CV F1: %.4f | Test F1: %.4f", lgb_cv["cv_f1_mean"], lgb_test["test_f1_macro"])
+        model_results["LightGBM"] = {**lgb_cv, **lgb_val, "_model": lgb_model}
+        logger.info("  LGB — CV F1: %.4f | Val F1: %.4f", lgb_cv["cv_f1_mean"], lgb_val["val_f1_macro"])
 
         # 3) Stacking (RF + XGB + LGB)
         logger.info("Config %s: training Stacking ...", config)
         stk_model, stk_cv = train_stacking(X_train, y_train, tscv, lgb_params=lgb_params)
-        stk_test = evaluate_model(stk_model, X_test, y_test)
-        model_results["Stacking"] = {**stk_cv, **stk_test, "_model": stk_model}
-        logger.info("  Stacking — CV F1: %.4f | Test F1: %.4f", stk_cv["cv_f1_mean"], stk_test["test_f1_macro"])
+        stk_val = evaluate_model(stk_model, X_val, y_val, prefix="val")
+        model_results["Stacking"] = {**stk_cv, **stk_val, "_model": stk_model}
+        logger.info("  Stacking — CV F1: %.4f | Val F1: %.4f", stk_cv["cv_f1_mean"], stk_val["val_f1_macro"])
 
-        # ---- Pick best model by test F1 ----
-        best_name = max(model_results, key=lambda k: model_results[k]["test_f1_macro"])
+        # ---- Pick best model by validation F1 ----
+        best_name = max(model_results, key=lambda k: model_results[k]["val_f1_macro"])
         best = model_results[best_name]
         best_model = best.pop("_model")
+
+        # ---- Final test evaluation (once, for the selected model only) ----
+        best_test = evaluate_model(best_model, X_test, y_test, prefix="test", include_report=True)
 
         # Remove _model refs from other entries
         for v in model_results.values():
@@ -389,14 +410,17 @@ def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
             "n_features": len(feature_cols),
             "feature_cols": feature_cols,
             "best_model": best_name,
-            **{k: v for k, v in best.items()},  # best model metrics as top-level
+            "selection_metric": "val_f1_macro",
+            **{k: v for k, v in best.items()},
+            **best_test,
             "per_model": model_results,
         }
 
         logger.info(
-            "Config %s BEST: %s — Test F1: %.4f | Test Acc: %.4f",
+            "Config %s BEST: %s — Val F1: %.4f | Test F1: %.4f | Test Acc: %.4f",
             config, best_name,
-            best["test_f1_macro"], best["test_accuracy"],
+            best["val_f1_macro"],
+            best_test["test_f1_macro"], best_test["test_accuracy"],
         )
 
         # Save Config C best model as production model
@@ -438,14 +462,16 @@ def print_ablation_table(results: dict) -> None:
     # Per-model breakdown
     print("\n" + "-" * 80)
     print("Per-Model Breakdown:")
-    print(f"{'Config':<10} {'Model':<14} {'CV F1':<18} {'Test F1':<10} {'Test Acc':<10}")
+    print(f"{'Config':<10} {'Model':<14} {'CV F1':<18} {'Val F1':<10} {'Val Acc':<10}")
     print("-" * 80)
     for config, r in results.items():
         for model_name, mr in r.get("per_model", {}).items():
             cv_str = f"{mr['cv_f1_mean']:.4f} ± {mr['cv_f1_std']:.4f}"
+            val_f1 = mr.get("val_f1_macro", float("nan"))
+            val_acc = mr.get("val_accuracy", float("nan"))
             print(
                 f"Config {config:<4} {model_name:<14} {cv_str:<18} "
-                f"{mr['test_f1_macro']:.4f}     {mr['test_accuracy']:.4f}"
+                f"{val_f1:.4f}     {val_acc:.4f}"
             )
     print("=" * 80)
 

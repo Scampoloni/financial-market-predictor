@@ -34,17 +34,19 @@ All models evaluated on held-out **2025 test data** (temporal split, no leakage)
 
 | Config | Features | # Features | Best Model | CV F1 ± std | Test F1 | Test Acc | Δ vs Baseline |
 |--------|----------|-----------|------------|:-----------:|:-------:|:--------:|:-------------:|
-| **A** | Market only | 32 | LightGBM | 0.509 ± 0.018 | 0.4949 | 0.4952 | — |
-| **B** | Market + NLP | 56 | RandomForest | 0.500 ± 0.022 | 0.4969 | 0.4978 | +0.0020 |
-| **C** | Market + NLP + CV | 66 | RandomForest | 0.495 ± 0.027 | **0.4992** | 0.5000 | +0.0043 |
+| **A** | Market only | 28 | LightGBM | 0.509 ± 0.022 | 0.4892 | 0.4898 | — |
+| **B** | Market + NLP | 56 | LightGBM | 0.513 ± 0.015 | 0.4852 | 0.4861 | -0.0040 |
+| **C** | Market + NLP + CV | 66 | LightGBM | 0.505 ± 0.023 | **0.4908** | 0.4911 | +0.0016 |
 
-**Interpretation:** ~0.50 F1 is a realistic ceiling for direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. Each block provides a small but measurable and consistent lift.
+**Interpretation:** ~0.50 F1 remains a realistic ceiling for direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. NLP shows mixed impact under sparse coverage; CV adds a modest positive lift when combined with market features.
+
+**Selection protocol:** Best model per config is chosen by **validation F1 only** (2024H2). The **test set (2025)** is evaluated once for final reporting.
 
 | Modality | Contribution | Why it works |
 |----------|-------------|--------------|
 | Market (ML) | Baseline | Technical indicators capture momentum, volatility, mean-reversion regimes |
-| NLP | +0.0020 F1 | Sentiment *changes* lead price; sector/market fallback provides ~59% coverage |
-| CV | +0.0023 F1 | Fine-tuned EfficientNet-B0 encodes visual patterns frozen ImageNet weights miss |
+| NLP | -0.0040 F1 vs A | Sentiment *changes* can lead price, but coverage remains sparse even with fallback |
+| CV | +0.0016 F1 vs A (+0.0056 vs B) | Fine-tuned EfficientNet-B0 captures visual patterns complementary to indicators |
 
 ### Multi-Horizon Comparison
 
@@ -52,10 +54,11 @@ The app also supports a **21-day prediction horizon** (Config C equivalent, 61 f
 
 | Horizon | Features | Test F1 | Test Acc | Test Rows |
 |---------|----------|:-------:|:--------:|:---------:|
-| **5-day** | 66 (Config C) | **0.4992** | 0.5000 | 16,348 |
+| **5-day** | 66 (Config C) | **0.4908** | 0.4911 | 20,033 |
 | **21-day** | 61 (Config C) | 0.4961 | 0.4989 | 18,961 |
 
 **Finding:** The EMH ceiling (~0.50 F1) holds consistently across both prediction horizons, confirming that the signal limitation is structural rather than specific to the 5-day window. The 21-day model offers slightly higher recall on DOWN predictions (0.65 vs 0.59), suggesting chart patterns carry more signal over longer windows.
+**Note:** 5-day numbers reflect the validation-based selection protocol update; re-train the 21-day model to align metrics if required.
 
 ---
 
@@ -68,12 +71,12 @@ DATA COLLECTION
 └── mplfinance    → Candlestick chart images (61,640+ PNGs, bi-daily)
 
 FEATURE EXTRACTION
-├── Market block  : 28 technical indicators + sector encoding       → 32 features
+├── Market block  : 28 technical indicators + sector encoding       → 28 features
 ├── NLP block     : FinBERT + VADER + embedding PCA + analyst data  → 24 features
 └── CV block      : Fine-tuned EfficientNet-B0 → 1280-dim → PCA    → 10 features
 
 UNIFIED FEATURE MATRIX (per ticker-date)
-├── Config A: 32 features  (market only)
+├── Config A: 28 features  (market only)
 ├── Config B: 56 features  (+ NLP)
 └── Config C: 66 features  (+ CV)      ← best performing
 
@@ -144,7 +147,7 @@ financial-market-predictor/
 
 ## Feature Summary
 
-### Market Block (32 features)
+### Market Block (28 features)
 Returns (1d/5d/20d), RSI-14, MACD (line/signal/histogram), SMA-20/SMA-50/EMA-12 ratios, Bollinger Bands (upper/lower/width), ATR-14, 20-day volatility, volume ratio, VIX level, day-of-week and month cyclical encoding (sin/cos), sector one-hot dummies.
 
 ### NLP Block (24 features)
@@ -196,7 +199,7 @@ The initial version reached F1 = 0.34 across three classes (UP/DOWN/SIDEWAYS) on
 
 ## Notebook vs. Production Pipeline
 
-The notebooks (`01`–`06`) document the **iterative development process** and contain saved outputs from the exploratory phase (v1: 3-class UP/DOWN/SIDEWAYS, 28 features, F1≈0.34). The production pipeline in `src/` implements the final version (v2: binary UP/DOWN, 32–66 features depending on config, F1≈0.50). The key changes are captured in the [Development Journey](#development-journey) section above. Both versions are intentionally preserved to show the full research arc.
+The notebooks (`01`–`06`) document the **iterative development process** and contain saved outputs from the exploratory phase (v1: 3-class UP/DOWN/SIDEWAYS, 28 features, F1≈0.34). The production pipeline in `src/` implements the final version (v2: binary UP/DOWN, 28–66 features depending on config, F1≈0.50). The key changes are captured in the [Development Journey](#development-journey) section above. Both versions are intentionally preserved to show the full research arc.
 
 ---
 
