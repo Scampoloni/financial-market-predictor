@@ -171,6 +171,13 @@ FinBERT compound score + confidence, VADER compound score, news volume (1d/5d ro
 
 ---
 
+## Ticker Selection Rationale
+
+- **Liquidity and data quality:** focus on large-cap S&P 500 names with reliable OHLCV history and consistent trading calendars.
+- **Sector coverage:** include tickers across 7 sectors to avoid sector-specific overfitting and enable sector-level error analysis.
+- **Signal diversity:** mix growth (Tech) and defensive sectors (Consumer, Healthcare) to capture different regimes.
+- **Practical constraints:** exclude thinly traded or short-history tickers to avoid missing data and unstable indicators.
+
 ## NLP Approach Comparison
 
 | Approach | Type | Strengths | Role |
@@ -279,5 +286,8 @@ pytest tests/ -q
 - Predictions are uncertain by nature — the model is wrong roughly half the time
 - **Not investment advice.** Never use this for real capital allocation
 - **Survivorship bias:** only currently-listed S&P 500 stocks; delisted companies are excluded
+- **Source bias:** news data is English-only and limited to select RSS/NewsAPI sources, which may skew sentiment.
+- **Information leakage risk:** widely disseminated signals can reduce edge (self-fulfilling/decaying alpha).
+- **Access inequality:** data availability and compute resources may advantage larger market participants.
 - Public news may reflect already-priced-in information (semi-strong EMH)
 - Past performance on the 2025 test set does not guarantee future performance
