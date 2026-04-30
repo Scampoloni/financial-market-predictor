@@ -265,6 +265,29 @@ streamlit run app.py
 pytest tests/ -q
 ```
 
+### Smoke-test dataset (reproducible)
+
+For a fast, fully reproducible run without large downloads, use the bundled smoke dataset
+(AAPL/MSFT/NVDA + indices, 3 months of data) and the existing `--test` flags:
+
+```bash
+# Build smoke dataset from current raw data
+python scripts/build_smoke_dataset.py
+
+# Activate smoke dataset (backs up data/raw to data/raw_full)
+python scripts/use_smoke_data.py --activate
+
+# Run the smoke pipeline
+python -m src.features.market_features --test
+python -m src.features.nlp_features --test
+python -m src.data_collection.chart_generator --test --step 2
+python -m src.features.cv_features --test
+python -m src.models.train_ml --config C
+
+# Restore full dataset
+python scripts/use_smoke_data.py --restore
+```
+
 ---
 
 ## Tech Stack

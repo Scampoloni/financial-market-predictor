@@ -59,7 +59,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 ### B6. Execution Instructions
 | Requirement | Status | Evidence | Remaining Action |
 |---|---|---|---|
-| Reproducible local run instructions | Done | `README.md` Setup and pipeline commands | Keep commands synced with modules |
+| Reproducible local run instructions | Done | `README.md` Setup + smoke-test dataset instructions | Keep commands synced with modules |
 
 ## C. Assessment Criteria Readiness
 
