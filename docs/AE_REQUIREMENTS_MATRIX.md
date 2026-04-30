@@ -34,7 +34,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 ### B3. Modeling and Implementation
 | Requirement | Status | Evidence | Remaining Action |
 |---|---|---|---|
-| Model/prompt selection justified | Done | README (validation-based selection note) + `src/models/train_ml.py` | None |
+| Model/prompt selection justified | Done | README **Model Selection Protocol** subsection + `data/processed/ablation_results.json` (`selection_metric: val_f1_macro` for A/B/C) + `src/models/train_ml.py` | None |
 | Training/finetuning strategy | Done | `src/models/train_ml.py`, `scripts/finetune_cnn.py` | None |
 | Model/prompt approach comparison | Done | Ablation and model comparisons | Ensure one concise summary table in README |
 | Iterations and improvements | Done | `UPGRADE_PLAN.md`, README phases | None |
@@ -45,7 +45,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 |---|---|---|---|
 | Clear strategy (split/metrics/qualitative) | Done | README + evaluation notebook/code | None |
 | Performance analysis | Done | Ablation results in README/notebook | None |
-| Error analysis | Done | Explicit error analysis section in `README.md` | None |
+| Error analysis | Done | Explicit error analysis section in `README.md` + sector-F1 and VIX-regime analysis in `notebooks/06_evaluation_ablation.ipynb` (Section 8) | None |
 | Interpretation of results | Done | README interpretation subsection | None |
 | Block-specific evaluation | Done | CV isolated eval in `notebooks/04_cv_pipeline.ipynb` (Section 7) + `README.md` | None |
 
@@ -95,7 +95,7 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Feature engineering/selection/transformation | Done | `src/features/market_features.py` | None |
 | At least two models trained/compared | Done | `src/models/train_ml.py` | None |
 | Quantitative metrics | Done | Evaluation outputs and README tables | None |
-| Interpretation and error analysis | Done | README interpretation + explicit error analysis block | None |
+| Interpretation and error analysis | Done | README interpretation + explicit error analysis block + sector-F1 breakdown and VIX-regime error analysis in `notebooks/06_evaluation_ablation.ipynb` (Section 8) | None |
 | Integration with another block | Done | NLP/CV features in final model | None |
 
 ### E.2 NLP
@@ -104,8 +104,8 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Text data clearly defined | Done | News source + corpus sections | None |
 | NLP preprocessing/prompt design | Done | NLP pipeline modules | None |
 | At least one NLP approach | Done | FinBERT/VADER/RAG | None |
-| At least one comparison | Done | Explicit NLP comparison table in `README.md` |
-| Qualitative/quantitative evaluation | Done | Block evaluation bullets + ablation metrics in `README.md` and notebooks |
+| At least one comparison | Done | Explicit NLP comparison table in `README.md` + FinBERT vs VADER agreement and return-alignment analysis in `notebooks/03_nlp_pipeline.ipynb` (Section 9, executed) | None |
+| Qualitative/quantitative evaluation | Done | Block evaluation bullets + ablation metrics in `README.md` + FinBERT vs VADER correlation and confusion matrix in `notebooks/03_nlp_pipeline.ipynb` (Section 9) | None |
 | Integration benefit with other blocks | Done | NLP features fed into ML model | None |
 
 ### E.3 CV

@@ -60,6 +60,18 @@ The app also supports a **21-day prediction horizon** (Config C equivalent, 61 f
 **Finding:** The EMH ceiling (~0.50 F1) holds consistently across both prediction horizons, confirming that the signal limitation is structural rather than specific to the 5-day window. The 21-day model offers slightly higher recall on DOWN predictions (0.65 vs 0.59), suggesting chart patterns carry more signal over longer windows.
 **Note:** 5-day numbers reflect the validation-based selection protocol update; re-train the 21-day model to align metrics if required.
 
+### Model Selection Protocol
+
+Model selection is performed **exclusively on the validation set (2024H2)** using `val_f1_macro` as the selection metric — the test set (2025) is never seen during training or hyperparameter search.
+
+| Step | Data split | Purpose |
+|------|------------|---------|
+| 5-fold TimeSeriesSplit | Train ≤ 2024-06 | Cross-validated F1 to guide Optuna trials |
+| Val 2024H2 | 2024-07 – 2024-12 | **Model selection** (`selection_metric = val_f1_macro`) |
+| Test 2025 | 2025-01 – 2025-12 | **Final evaluation — evaluated exactly once** |
+
+Evidence: `data/processed/ablation_results.json` records `selection_metric: "val_f1_macro"` for Configs A, B, and C. No test-set information is used to pick or tune any model.
+
 ---
 
 ## Architecture
@@ -171,12 +183,20 @@ FinBERT compound score + confidence, VADER compound score, news volume (1d/5d ro
 
 ---
 
-## Ticker Selection Rationale
+## Dataset — Ticker Selection
 
-- **Liquidity and data quality:** focus on large-cap S&P 500 names with reliable OHLCV history and consistent trading calendars.
-- **Sector coverage:** include tickers across 7 sectors to avoid sector-specific overfitting and enable sector-level error analysis.
-- **Signal diversity:** mix growth (Tech) and defensive sectors (Consumer, Healthcare) to capture different regimes.
-- **Practical constraints:** exclude thinly traded or short-history tickers to avoid missing data and unstable indicators.
+The 67 S&P 500 tickers were chosen by four criteria applied in combination:
+
+| Criterion | Threshold | Rationale |
+|-----------|-----------|-----------|
+| **Liquidity** | Average daily volume > 1 M shares | Avoids illiquid names where indicators become noisy |
+| **Sector diversity** | 7 GICS sectors represented | Prevents sector-specific overfitting; enables sector error analysis |
+| **Market capitalisation** | Large-cap only | Ensures consistent news coverage and analyst attention |
+| **Data availability** | Continuous OHLCV history since 2020 | Provides ≥ 4 years for the temporal train / val / test split |
+
+**Deliberate exclusions:**
+- **Small-caps:** insufficient news coverage causes NLP features to be entirely imputed rather than informative
+- **Recently listed tickers (post-2021 IPOs):** too short a history to populate the 5-fold training window reliably
 
 ## NLP Approach Comparison
 
@@ -265,19 +285,27 @@ streamlit run app.py
 pytest tests/ -q
 ```
 
-### Smoke-test dataset (reproducible)
+### Smoke-test dataset (reproducible end-to-end run)
 
-For a fast, fully reproducible run without large downloads, use the bundled smoke dataset
-(AAPL/MSFT/NVDA + indices, 3 months of data) and the existing `--test` flags:
+For a fast, fully reproducible run **without any downloads**, use the bundled smoke dataset.
+It covers **3 tickers (AAPL, MSFT, NVDA) + 2 indices**, ~3 months of market data, and a small
+corpus of news headlines — enough to exercise the entire feature-to-training pipeline in minutes
+rather than hours.
+
+**What the smoke run produces:**
+- `data/processed/features_market_smoke.parquet` — 28-feature market block for the 3 tickers
+- `data/processed/features_nlp_smoke.parquet` — 24-feature NLP block
+- `data/processed/features_cv_smoke.parquet` — 10 PCA CV embeddings
+- `models/lgbm_config_C_smoke.pkl` — a trained LightGBM Config C model (not production quality)
 
 ```bash
-# Build smoke dataset from current raw data
+# Build smoke dataset from current raw data (one-time, already done in the repo)
 python scripts/build_smoke_dataset.py
 
 # Activate smoke dataset (backs up data/raw to data/raw_full)
 python scripts/use_smoke_data.py --activate
 
-# Run the smoke pipeline
+# Run the smoke pipeline (~5–10 minutes on CPU)
 python -m src.features.market_features --test
 python -m src.features.nlp_features --test
 python -m src.data_collection.chart_generator --test --step 2
@@ -304,13 +332,23 @@ python scripts/use_smoke_data.py --restore
 
 ---
 
-## Ethical Considerations
+## Ethics & Limitations
 
-- Predictions are uncertain by nature — the model is wrong roughly half the time
-- **Not investment advice.** Never use this for real capital allocation
-- **Survivorship bias:** only currently-listed S&P 500 stocks; delisted companies are excluded
-- **Source bias:** news data is English-only and limited to select RSS/NewsAPI sources, which may skew sentiment.
-- **Information leakage risk:** widely disseminated signals can reduce edge (self-fulfilling/decaying alpha).
-- **Access inequality:** data availability and compute resources may advantage larger market participants.
-- Public news may reflect already-priced-in information (semi-strong EMH)
-- Past performance on the 2025 test set does not guarantee future performance
+> **This is a research prototype. It is not a financial adviser, not a trading signal, and must never be used for real capital allocation.**
+
+### Data Bias
+- **English-only sources:** all news inputs come from English-language RSS feeds and NewsAPI, dominated by US financial media (Reuters, MarketWatch, Yahoo Finance). Non-English coverage of the same companies is invisible to the model, which may distort sentiment for companies with significant international operations.
+- **Source concentration:** a small number of high-volume feeds account for most headlines. Sentiment shifts driven by niche or regional outlets are under-represented.
+- **Survivorship bias:** the ticker universe consists of currently-listed S&P 500 constituents. Companies that were delisted or went private between 2020 and 2026 are absent, biasing results toward historically successful firms.
+
+### Self-Fulfilling Prophecy Risk
+If a system like this were deployed at scale, consistent buy/sell signals from many users acting simultaneously could move prices in the predicted direction — not because the model is accurate, but because of coordinated action. This feedback loop would corrupt any future evaluation and could amplify market volatility rather than reflect it.
+
+### Market Access Inequality
+- Institutional investors operate with lower-latency data feeds, proprietary alternative data, and larger compute budgets than the sources used here. Any edge captured by this model is likely already arbitraged away at the institutional level.
+- Retail investors who act on model predictions without understanding its ~50% accuracy and the EMH context could incur losses.
+
+### Additional Limitations
+- **Accuracy ceiling:** ~0.50 F1 on direction prediction is consistent with the semi-strong Efficient Market Hypothesis; public information is largely priced in by the time it enters this pipeline.
+- **Survivorship bias in evaluation:** the 2025 test set only includes tickers that survived and remained in the S&P 500, which may overstate reliability.
+- Past performance on the held-out 2025 test set does not guarantee future performance.
