@@ -755,7 +755,7 @@ def render() -> None:
     clicked_ticker = _render_watchlist()
 
     # ── Ticker selector row ──────────────────────────────────────────────────
-    col_sel, col_horizon, col_btn, _ = st.columns([2, 1.5, 1, 2.5])
+    col_sel, col_horizon, col_btn, col_sync, _ = st.columns([2, 1.5, 1, 1, 1.5])
 
     with col_sel:
         default_idx = TICKERS_SORTED.index(clicked_ticker) if clicked_ticker and clicked_ticker in TICKERS_SORTED \
@@ -778,6 +778,21 @@ def render() -> None:
 
     with col_btn:
         run = st.button("Predict", type="primary", use_container_width=True)
+        
+    with col_sync:
+        sync_btn = st.button("Sync News", use_container_width=True)
+        
+    if sync_btn:
+        with st.spinner(f"Fetching live news & sentiment for {ticker}..."):
+            try:
+                from src.data_collection.news_scraper import collect_all
+                from src.features.nlp_features import update_single_ticker_nlp
+                collect_all([ticker])
+                update_single_ticker_nlp(ticker)
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to sync news: {e}")
 
     # ── Ticker info header ───────────────────────────────────────────────────
     sector = TICKER_SECTOR_MAP.get(ticker, "")

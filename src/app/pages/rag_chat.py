@@ -104,7 +104,27 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    ask_btn = st.button("Ask", type="primary", use_container_width=False)
+    col_ask, col_live = st.columns([1, 4])
+    with col_ask:
+        ask_btn = st.button("Ask", type="primary", use_container_width=False)
+    with col_live:
+        fetch_live_btn = False
+        if ticker_filter:
+            fetch_live_btn = st.button("🔄 Fetch Live News for Ticker", help=f"Downloads the latest news for {ticker_filter} into the index.")
+            
+    if fetch_live_btn and ticker_filter:
+        with st.spinner(f"Fetching latest news for {ticker_filter}..."):
+            try:
+                from src.data_collection.news_scraper import collect_all
+                from src.features.nlp_features import update_single_ticker_nlp
+                collect_all([ticker_filter])
+                update_single_ticker_nlp(ticker_filter)
+                rag = _get_rag()
+                rag.rebuild_index()
+                st.cache_resource.clear()
+                st.success(f"Successfully fetched new headlines for {ticker_filter} and rebuilt index!")
+            except Exception as e:
+                st.error(f"Failed to fetch live news: {e}")
 
     # ── Chat history (session state) ──────────────────────────────────────────
     if "rag_history" not in st.session_state:
