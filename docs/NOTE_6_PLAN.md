@@ -1,140 +1,103 @@
-# Note-6 Upgrade Plan
+# Note-6 Upgrade Plan (updated 2026-04-30)
 
-Goal: make the project clearly note-6 worthy by closing methodical gaps (CV isolated evaluation, proper model selection) and strengthening analysis, reproducibility, and documentation with explicit evidence.
+Current grade: **5.6 / 6** (second evaluator assessment)
+Goal: close the remaining 0.4 points via two concrete technical additions.
 
-## 1) Critical Gaps (must fix)
+---
 
-### 1.1 CV block isolated evaluation
-Add a dedicated CV evaluation in notebooks/04_cv_pipeline.ipynb:
-- Confusion matrix: chart -> UP/DOWN on validation set
-- Accuracy/F1 of the CV model alone (not only ablation delta)
-- Visual inspection: 2-3 example charts with predicted label vs. actual
+## Status — completed items
 
-Why: CV is currently only evaluated indirectly by its contribution to the full model.
+All items below are done and verified. Do not redo them.
 
-### 1.2 Model selection protocol (test-set isolation)
-Fix src/models/train_ml.py:
-- Choose models exclusively via validation set (2024H2) or CV
-- Use test set (2025) exactly once at the end for final reporting
-- Update README and docs to explicitly state the protocol
-Notes:
-- This is the most time-intensive step. It requires re-training all models.
-- After the fix, regenerate ablation_results.json and all saved models so README numbers and artifacts match.
+| Item | Evidence |
+|---|---|
+| CV isolated evaluation (04_cv_pipeline.ipynb Sektion 7) | Confusion matrix, Accuracy/F1, visual inspection — executed and saved |
+| Model selection protocol (val_f1_macro, not test) | Documented in README + ablation_results.json (`selection_metric: val_f1_macro`) + code line 398 in train_ml.py |
+| Error analysis by sector and VIX regime (06_evaluation_ablation.ipynb Sektion 8) | Sector-F1 bar chart, VIX regime F1, False UP / False DOWN breakdown |
+| Reproducibility — smoke-test dataset | scripts/build_smoke_dataset.py + README section with steps and expected outputs |
+| FinBERT vs VADER section (03_nlp_pipeline.ipynb Sektion 9) | Executed — produced "Days with news: 0" due to smoke data sparsity (see open item 1 below) |
+| Ethics & Limitations section | README section with Data Bias, Self-fulfilling Prophecy, Market Access Inequality |
+| Ticker selection rationale | README section with criteria table and explicit exclusions |
+| Notebook version headers | All notebooks (01–06) have v1/v2 version note at top |
 
-Why: current model selection based on test-F1 risks optimism bias.
+---
 
-### 1.3 Error analysis depth by sector and regime
-Extend notebooks/06_evaluation_ablation.ipynb:
-- F1 per sector (Tech vs Energy vs Healthcare, etc.)
-- Error rates in volatile vs calm regimes (e.g., VIX > 25 vs VIX < 15)
-- Most frequent error types (False UP / False DOWN) with interpretation
+## Open items (what separates 5.6 from 6.0)
 
-Why: analysis is currently high-level; deeper failure modes are required for top marks.
+The evaluator named exactly two gaps that cost the remaining points:
 
-## 2) Important Improvements (raise score by ~0.1-0.15 each)
+### 1. NLP comparison has no usable numbers (highest impact, ~0.2–0.3 points)
 
-### 2.1 Reproducibility without manual steps
-Provide a fully reproducible path:
-- Add scripts/download_data.* or a Makefile to fetch data
-- Or add DVC integration with remote storage
-- Or include a minimal smoke-test dataset (e.g., 5 tickers, 3 months) in repo
+**Problem:** Notebook 03 Sektion 9 (FinBERT vs VADER Return-Alignment) outputs
+"Days with news: 0" because the smoke-dataset has all headlines on a single scraping
+date with no overlap to daily market data. The comparison cell runs but produces
+no meaningful correlation or confusion matrix.
 
-Recommendation:
-- Use a smoke-test dataset (5 tickers, 3 months). This is lowest effort and does not depend on external infra.
-- A download script alone is not enough because historical NewsAPI data is not always available retroactively.
+**Fix:** Add a small curated evaluation dataset directly in the notebook — no external
+data needed. Approach:
 
-Update README with exact steps and expected outputs.
+1. In `notebooks/03_nlp_pipeline.ipynb` Sektion 9, before the return-alignment cell,
+   add a new cell that creates a minimal hardcoded evaluation set:
+   - 15–20 real financial headlines (can be taken from existing `data/raw/news/`)
+   - Each headline manually labeled as positive/negative/neutral sentiment based on
+     the known market reaction (e.g. "Apple beats earnings estimates" → positive,
+     "Fed raises rates by 75bps" → negative)
+   - Run both FinBERT and VADER on these headlines
+   - Compute: agreement rate, Cohen's Kappa, which model is closer to the manual label
+   - Show a small confusion matrix for each model vs. manual labels
 
-### 2.2 Explicit FinBERT vs VADER comparison
-Extend notebooks/03_nlp_pipeline.ipynb with:
-- Correlation between FinBERT and VADER scores
-- Which correlates better with returns
-- Confusion matrix: sentiment label vs next-day return
+2. Add a markdown result cell interpreting which model is more reliable for
+   financial headlines and why (FinBERT expected to win on domain-specific text).
 
-Why: the comparison exists implicitly but not as a formal analysis.
+**File:** `notebooks/03_nlp_pipeline.ipynb`
+**Effort:** ~2–3 hours
 
-### 2.3 Ethics and bias section
-Add a dedicated Ethics section in README:
-- Data bias (English-only, limited sources)
-- Self-fulfilling prophecy risk
-- Market access inequality
+---
 
-Why: current disclaimer is present but too short for full bonus credit.
+### 2. Block contribution deltas are not statistically validated (~0.1–0.15 points)
 
-## 3) Nice-to-have (bonus and clarity)
+**Problem:** NLP adds −0.004 F1, CV adds +0.0016 F1 — these deltas are so small they
+could be noise. The evaluator explicitly asked for a significance discussion.
 
-### 3.1 Ticker selection rationale
-Moved to Important: this is a low-effort, high-signal improvement.
-Add a short rationale in README:
-- Criteria: liquidity, sector diversity, market cap, data availability
-- Why these 67 tickers, and why some are excluded
+**Fix:** Add a Bootstrap confidence interval analysis to `notebooks/06_evaluation_ablation.ipynb`
+as a new Sektion 9:
 
-### 3.2 Notebook version clarity
-Reduce confusion between v1 and v2:
-- Add a clear header in each notebook (v1 exploratory vs v2 production)
-- Or move v1 notebooks to notebooks/archive and add a README note
+1. For each Config (A, B, C), bootstrap resample the test set predictions (e.g. 1000
+   iterations, sample with replacement from the test rows).
+2. Compute F1 macro for each bootstrap sample → distribution of F1 per config.
+3. Compute bootstrap CI for the delta B−A and C−B.
+4. Plot: overlapping distributions or CI bar chart for all three configs.
+5. Interpret: if CI for delta B−A excludes zero → NLP signal is statistically real.
+   If not → honest statement that the improvement is within noise at this sample size.
 
-## 4) Verification Checklist
+This does not require retraining — only the saved test-set predictions are needed.
+If `ablation_results.json` does not store per-row predictions, load the model and
+run `model.predict(X_test)` directly in the notebook.
 
-1. Run CV evaluation section in notebooks/04_cv_pipeline.ipynb and save outputs
-2. Re-run training with validation-based model selection, then final test once
-3. Re-run error analysis in notebooks/06_evaluation_ablation.ipynb
-4. Re-run NLP comparison in notebooks/03_nlp_pipeline.ipynb
-5. Validate reproducibility via new script or DVC path
-6. Update README and docs/AE_REQUIREMENTS_MATRIX.md with evidence links
+**File:** `notebooks/06_evaluation_ablation.ipynb`
+**Effort:** ~2 hours
 
-## 5) File Targets
+---
 
-- README.md (methodology, ethics, ticker rationale, reproducibility, evidence links)
-- src/models/train_ml.py (model selection protocol)
-- src/models/evaluate.py (optional helper for sector/regime analysis)
-- src/cv/chart_classifier.py (optional CV evaluation helper)
-- notebooks/03_nlp_pipeline.ipynb (FinBERT vs VADER analysis)
-- notebooks/04_cv_pipeline.ipynb (CV isolated evaluation)
-- notebooks/06_evaluation_ablation.ipynb (error analysis depth)
-- docs/AE_REQUIREMENTS_MATRIX.md (evidence updates)
-- docs/FINAL_SUBMISSION_RUNBOOK.md (confirm updated checks)
-- scripts/ (reproducibility helper if chosen)
+## Priority order
 
-## 6) Priority Summary
+1. **NLP curated evaluation** (item 1) — higher impact, clearly named by evaluator
+2. **Bootstrap CI** (item 2) — medium impact, ~1 paragraph of analysis
 
-- Highest impact: CV isolated evaluation + model selection protocol fix
-- Medium impact: error analysis depth + reproducibility
-- Lower impact: ethics expansion + notebook version clarity
+---
 
-## 7) Decisions Needed
+## Verification checklist
 
-- Reproducibility approach: DVC vs download script vs smoke-test dataset (recommended: smoke-test dataset)
-- Notebook versioning: archive v1 vs add explicit headers
-- CV evaluation: frozen vs fine-tuned comparison (recommended)
+- [ ] 03_nlp_pipeline.ipynb Sektion 9 shows actual numbers (agreement rate, kappa, confusion matrices)
+- [ ] 06_evaluation_ablation.ipynb Sektion 9 shows bootstrap CI plots with interpretation
+- [ ] Both notebooks re-executed with kernel `financial-market-predictor` and outputs saved
+- [ ] AE_REQUIREMENTS_MATRIX.md updated with evidence links for both new sections
 
-## 8) Additional Notes
+---
 
-- notebooks/04_cv_pipeline.ipynb is currently thin; expect a larger refactor to add a proper CV evaluation section.
-- Estimated time: 2-3 days total. Most points (1.1, 1.3, 2.2, 2.3, 3.1, 3.2) fit in one day. 1.2 and 2.1 each need a dedicated block.
+## What NOT to change
 
-## 9) Branch and Commit Strategy
-
-Goal: keep grading evidence traceable and avoid mixing unrelated changes.
-
-Branches:
-- main (stable)
-- feat/note-6-cv-eval
-- feat/note-6-model-selection
-- feat/note-6-error-analysis
-- feat/note-6-nlp-comparison
-- feat/note-6-reproducibility
-- feat/note-6-docs-and-ethics
-
-Commit cadence:
-- One work package per branch, 1-3 focused commits each.
-- Merge in order of dependencies: model selection -> ablation regen -> analysis notebooks -> docs updates.
-
-Suggested commit sequence:
-1. cv: isolated CNN evaluation + visual inspection
-2. ml: validation-based model selection + retrain + regen artifacts
-3. analysis: sector/regime error analysis additions
-4. nlp: FinBERT vs VADER comparison section
-5. repro: smoke-test dataset + reproducibility docs
-6. docs: ethics + ticker rationale + notebook version clarity
-7. docs: update AE_REQUIREMENTS_MATRIX evidence
+- Do not retrain models — all training artifacts are final.
+- Do not change the smoke-dataset setup — it works.
+- Do not touch README sections that are already done (ethics, ticker rationale, etc.).
+- Do not add new features to the Streamlit app.
