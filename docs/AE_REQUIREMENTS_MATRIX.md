@@ -44,10 +44,10 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Requirement | Status | Evidence | Remaining Action |
 |---|---|---|---|
 | Clear strategy (split/metrics/qualitative) | Done | README + evaluation notebook/code | None |
-| Performance analysis | Done | Ablation results in README/notebook | None |
+| Performance analysis | Done | Ablation results in README/notebook + **bootstrap 95% CI in `notebooks/06_evaluation_ablation.ipynb` (Section 9)**: Config C CI [0.487, 0.502], N=2,000 iterations | None |
 | Error analysis | Done | Explicit error analysis section in `README.md` + sector-F1 and VIX-regime analysis in `notebooks/06_evaluation_ablation.ipynb` (Section 8) | None |
-| Interpretation of results | Done | README interpretation subsection | None |
-| Block-specific evaluation | Done | CV isolated eval in `notebooks/04_cv_pipeline.ipynb` (Section 7) + `README.md` | None |
+| Interpretation of results | Done | README interpretation subsection + bootstrap overlap interpretation (EMH, Section 9 notebook 06) | None |
+| Block-specific evaluation | Done | CV isolated eval in `notebooks/04_cv_pipeline.ipynb` (Section 7) + NLP curated benchmark (FinBERT acc=0.792, VADER acc=0.800) in `notebooks/03_nlp_pipeline.ipynb` (Section 9) | None |
 
 ### B5. Deployment
 | Requirement | Status | Evidence | Remaining Action |
@@ -104,8 +104,8 @@ This matrix is the operational checklist for reaching full compliance with the Z
 | Text data clearly defined | Done | News source + corpus sections | None |
 | NLP preprocessing/prompt design | Done | NLP pipeline modules | None |
 | At least one NLP approach | Done | FinBERT/VADER/RAG | None |
-| At least one comparison | Done | Explicit NLP comparison table in `README.md` + FinBERT vs VADER agreement and return-alignment analysis in `notebooks/03_nlp_pipeline.ipynb` (Section 9, executed) | None |
-| Qualitative/quantitative evaluation | Done | Block evaluation bullets + ablation metrics in `README.md` + FinBERT vs VADER correlation and confusion matrix in `notebooks/03_nlp_pipeline.ipynb` (Section 9) | None |
+| At least one comparison | Done | Explicit NLP comparison table in `README.md` + **curated 24-headline benchmark** in `notebooks/03_nlp_pipeline.ipynb` (Section 9): FinBERT acc=0.792 vs VADER acc=0.800, score-direction corr 0.694 vs 0.656, confusion matrices | None |
+| Qualitative/quantitative evaluation | Done | Block evaluation bullets + ablation metrics in `README.md` + FinBERT vs VADER confusion matrices, direction accuracy, macro-F1, score-direction correlation in `notebooks/03_nlp_pipeline.ipynb` (Section 9) | None |
 | Integration benefit with other blocks | Done | NLP features fed into ML model | None |
 
 ### E.3 CV
