@@ -43,7 +43,7 @@ def render() -> None:
             '<div style="font-size:1.6rem;margin-bottom:6px">📊</div>'
             '<div style="font-weight:700;color:#10b981;font-size:1rem;margin-bottom:8px">Block 1: ML</div>'
             '<div style="color:#94a3b8;font-size:0.85rem;line-height:1.6">'
-            'LightGBM + RandomForest on <b style="color:#e2e8f0">32 market features</b><br>'
+            'LightGBM + RandomForest on <b style="color:#e2e8f0">28 market features</b><br>'
             '<span style="color:#475569">RSI, MACD, Bollinger Bands, ATR, VIX, volume ratio, '
             'SMA/EMA ratios, sector dummies</span><br><br>'
             '<span style="color:#475569;font-size:0.8rem">Source: Yahoo Finance (yfinance)</span>'
@@ -57,7 +57,7 @@ def render() -> None:
             '<div style="font-size:1.6rem;margin-bottom:6px">📰</div>'
             '<div style="font-weight:700;color:#f59e0b;font-size:1rem;margin-bottom:8px">Block 2: NLP</div>'
             '<div style="color:#94a3b8;font-size:0.85rem;line-height:1.6">'
-            'FinBERT + VADER on <b style="color:#e2e8f0">6,111 news headlines</b><br>'
+            'FinBERT + VADER on <b style="color:#e2e8f0">8,552 news headlines</b><br>'
             '<span style="color:#475569">Sentiment score, momentum, surprise, dispersion, '
             'news volume z-score, sector fallback. '
             'RAG chatbot for interactive Q&amp;A.</span><br><br>'
@@ -72,7 +72,7 @@ def render() -> None:
             '<div style="font-size:1.6rem;margin-bottom:6px">📈</div>'
             '<div style="font-weight:700;color:#60a5fa;font-size:1rem;margin-bottom:8px">Block 3: CV</div>'
             '<div style="color:#94a3b8;font-size:0.85rem;line-height:1.6">'
-            'EfficientNet-B0 on <b style="color:#e2e8f0">41,000+ chart images</b><br>'
+            'EfficientNet-B0 on <b style="color:#e2e8f0">61,640+ chart images</b><br>'
             '<span style="color:#475569">Transfer learning (1280-dim) → PCA (10 dims). '
             'Fine-tuning on chart labels via '
             '<code style="font-size:0.78rem">scripts/finetune_cnn.py</code>.</span><br><br>'
@@ -87,8 +87,8 @@ def render() -> None:
 
     rows = [
         ("#10b981", "Yahoo Finance",    "5yr daily OHLCV for 67 S&P 500 tickers (2020–2026), ~550k rows"),
-        ("#f59e0b", "Financial News",   "RSS feeds (Reuters, MarketWatch) + yfinance news API, 6,111 headlines"),
-        ("#60a5fa", "Candlestick Charts","41,000+ images generated via mplfinance (30-day windows, step=2)"),
+        ("#f59e0b", "Financial News",   "RSS feeds (Reuters, MarketWatch) + yfinance news API, 8,552 headlines"),
+        ("#60a5fa", "Candlestick Charts","61,640+ images generated via mplfinance (30-day windows, step=2)"),
         ("#8b5cf6", "Pre-trained Models","ProsusAI/finbert (HuggingFace) · EfficientNet-B0 (torchvision ImageNet)"),
     ]
     table_rows = "".join(
@@ -187,7 +187,7 @@ def render() -> None:
                 unsafe_allow_html=True,
             )
 
-    with st.expander("📊 Market Block — 32 features", expanded=False):
+    with st.expander("📊 Market Block — 28 features", expanded=False):
         _glossary_rows(_MARKET_FEATURES, "#4a90d9")
 
     with st.expander("📰 NLP Block — 24 features", expanded=False):

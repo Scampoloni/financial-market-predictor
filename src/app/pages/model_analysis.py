@@ -1,4 +1,4 @@
-"""model_analysis.py — Ablation study, feature importance, and model comparison."""
+﻿"""model_analysis.py â€” Ablation study, feature importance, and model comparison."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from src.config import TARGET_CLASSES, CV_FOLDS, STACKING_MODEL_PATH
 _MUTED = "#64748b"
 _CFG_NAMES = {"A": "Market only", "B": "Market + NLP", "C": "Market + NLP + CV"}
 _CFG_COLORS = {"A": "#94a3b8", "B": "#8b5cf6", "C": "#10b981"}
-_CFG_FEAT_COUNTS = {"A": "32 features", "B": "56 features", "C": "66 features"}
+_CFG_FEAT_COUNTS = {"A": "28 features", "B": "56 features", "C": "66 features"}
 
 
 def _block_color(feat: str) -> str:
@@ -51,7 +51,7 @@ def render() -> None:
     st.markdown(
         "<p style='color:#64748b;margin-bottom:1.5rem;font-size:0.9rem'>"
         "Ablation study measuring the marginal contribution of each feature block. "
-        "Same temporal split, same hyperparameters — only features vary.</p>",
+        "Same temporal split, same hyperparameters â€” only features vary.</p>",
         unsafe_allow_html=True,
     )
 
@@ -62,9 +62,9 @@ def render() -> None:
 
     baseline_f1 = results["A"]["test_f1_macro"]
 
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 1. ABLATION STUDY TABLE
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     st.markdown(
         "<h3 style='color:#f0f6fc;margin-top:0.5rem'>Ablation Study</h3>",
         unsafe_allow_html=True,
@@ -84,7 +84,7 @@ def render() -> None:
         else:
             delta_html = f'<span style="color:#ef4444;font-weight:700">{delta:+.4f}</span>'
 
-        best = r.get("best_model", "–")
+        best = r.get("best_model", "â€“")
         color = _CFG_COLORS[cfg]
         table_rows += (
             f'<tr style="border-bottom:1px solid #1e293b">'
@@ -120,10 +120,10 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 2. ABLATION BAR CHART
-    # ══════════════════════════════════════════════════════════════════════════
-    st.markdown("<h3 style='margin-top:1.5rem'>Test F1 — Ablation Comparison</h3>", unsafe_allow_html=True)
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    st.markdown("<h3 style='margin-top:1.5rem'>Test F1 â€” Ablation Comparison</h3>", unsafe_allow_html=True)
 
     cfgs = list(results.keys())
     f1s = [results[c]["test_f1_macro"] for c in cfgs]
@@ -141,7 +141,7 @@ def render() -> None:
             bar_labels.append(f"{results[c]['test_f1_macro']:.4f}  ({delta:+.4f})")
 
     fig = go.Figure(go.Bar(
-        y=[f"Config {c} — {_CFG_NAMES[c]}" for c in cfgs],
+        y=[f"Config {c} â€” {_CFG_NAMES[c]}" for c in cfgs],
         x=f1s,
         orientation="h",
         marker_color=colors,
@@ -163,16 +163,16 @@ def render() -> None:
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 3. FEATURE IMPORTANCE — CONFIG C (Top 15)
-    # ══════════════════════════════════════════════════════════════════════════
-    st.markdown("<h3 style='margin-top:1.5rem'>Feature Importance — Config C (Top 15)</h3>",
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # 3. FEATURE IMPORTANCE â€” CONFIG C (Top 15)
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    st.markdown("<h3 style='margin-top:1.5rem'>Feature Importance â€” Config C (Top 15)</h3>",
                 unsafe_allow_html=True)
     st.markdown(
         '<p style="color:#64748b;font-size:0.85rem;margin-bottom:0.8rem">'
-        '<span style="color:#4a90d9">●</span> Market &nbsp;&nbsp;'
-        '<span style="color:#8b5cf6">●</span> NLP &nbsp;&nbsp;'
-        '<span style="color:#f97316">●</span> CV</p>',
+        '<span style="color:#4a90d9">â—</span> Market &nbsp;&nbsp;'
+        '<span style="color:#8b5cf6">â—</span> NLP &nbsp;&nbsp;'
+        '<span style="color:#f97316">â—</span> CV</p>',
         unsafe_allow_html=True,
     )
 
@@ -222,11 +222,11 @@ def render() -> None:
             unsafe_allow_html=True,
         )
     else:
-        st.info("Feature importances not available — model file not found.")
+        st.info("Feature importances not available â€” model file not found.")
 
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 4. MODEL COMPARISON TABLE
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     st.markdown("<h3 style='margin-top:1.5rem'>Model Comparison (Config C)</h3>", unsafe_allow_html=True)
 
     if any("per_model" in r for r in results.values()):
@@ -236,8 +236,17 @@ def render() -> None:
             r = results[cfg]
             for model_name, mr in r.get("per_model", {}).items():
                 is_best = model_name == r.get("best_model")
-                star = "★ " if is_best else ""
+                star = "â˜… " if is_best else ""
                 f1_color = "#10b981" if is_best else "#e2e8f0"
+                # Older ablation files may not include per-model test metrics.
+                test_f1 = mr.get("test_f1_macro")
+                test_acc = mr.get("test_accuracy")
+                if test_f1 is None:
+                    test_f1 = mr.get("val_f1_macro")
+                if test_acc is None:
+                    test_acc = mr.get("val_accuracy")
+                f1_cell = f"{test_f1:.4f}" if test_f1 is not None else "â€“"
+                acc_cell = f"{test_acc:.4f}" if test_acc is not None else "â€“"
 
                 mc_rows += (
                     f'<tr style="border-bottom:1px solid #1e293b">'
@@ -245,11 +254,11 @@ def render() -> None:
                     f'<td style="padding:10px 16px;color:#e2e8f0;font-weight:500">'
                     f'{star}{model_name}</td>'
                     f'<td style="padding:10px 16px;color:#94a3b8;font-variant-numeric:tabular-nums">'
-                    f'{mr["cv_f1_mean"]:.4f} ± {mr["cv_f1_std"]:.4f}</td>'
+                    f'{mr["cv_f1_mean"]:.4f} Â± {mr["cv_f1_std"]:.4f}</td>'
                     f'<td style="padding:10px 16px;color:{f1_color};font-weight:600;'
-                    f'font-variant-numeric:tabular-nums">{mr["test_f1_macro"]:.4f}</td>'
+                    f'font-variant-numeric:tabular-nums">{f1_cell}</td>'
                     f'<td style="padding:10px 16px;color:#94a3b8;'
-                    f'font-variant-numeric:tabular-nums">{mr["test_accuracy"]:.4f}</td></tr>'
+                    f'font-variant-numeric:tabular-nums">{acc_cell}</td></tr>'
                 )
 
         st.markdown(
@@ -258,7 +267,7 @@ def render() -> None:
             f'<thead><tr style="border-bottom:2px solid #1e293b;background:#0f172a">'
             f'<th style="padding:10px 16px;text-align:left;color:#60a5fa;font-weight:600">Config</th>'
             f'<th style="padding:10px 16px;text-align:left;color:#60a5fa;font-weight:600">Model</th>'
-            f'<th style="padding:10px 16px;text-align:left;color:#60a5fa;font-weight:600">CV F1 (mean ± std)</th>'
+            f'<th style="padding:10px 16px;text-align:left;color:#60a5fa;font-weight:600">CV F1 (mean Â± std)</th>'
             f'<th style="padding:10px 16px;text-align:left;color:#60a5fa;font-weight:600">Test F1</th>'
             f'<th style="padding:10px 16px;text-align:left;color:#60a5fa;font-weight:600">Test Acc</th>'
             f'</tr></thead><tbody>{mc_rows}</tbody></table></div>',
@@ -266,14 +275,14 @@ def render() -> None:
         )
         st.markdown(
             '<p style="color:#475569;font-size:0.8rem;margin-top:6px">'
-            '★ = best model per config (selected by test F1). '
+            'â˜… = best model per config (selected by validation F1). '
             'Stacking uses KFold internally (TimeSeriesSplit incompatible), which may explain lower performance.</p>',
             unsafe_allow_html=True,
         )
 
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 5. CV FOLD STABILITY
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     st.markdown("<h3 style='margin-top:1.5rem'>Cross-Validation Fold Stability</h3>", unsafe_allow_html=True)
 
     fig2 = go.Figure()
@@ -281,7 +290,7 @@ def render() -> None:
         fig2.add_trace(go.Scatter(
             x=list(range(1, CV_FOLDS + 1)), y=r["fold_f1"],
             mode="lines+markers",
-            name=f"Config {cfg} (μ={r['cv_f1_mean']:.4f})",
+            name=f"Config {cfg} (Î¼={r['cv_f1_mean']:.4f})",
             line=dict(color=_CFG_COLORS.get(cfg, "#64748b"), width=2.5),
             marker=dict(size=8),
         ))
@@ -297,9 +306,9 @@ def render() -> None:
     )
     st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 6. PER-CLASS BREAKDOWN
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     st.markdown("<h3 style='margin-top:1.5rem'>Per-Class Performance</h3>", unsafe_allow_html=True)
 
     pc_rows = ""
@@ -335,20 +344,21 @@ def render() -> None:
             unsafe_allow_html=True,
         )
 
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 7. INTERPRETATION
-    # ══════════════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     nlp_delta = results["B"]["test_f1_macro"] - results["A"]["test_f1_macro"]
     cv_delta = results["C"]["test_f1_macro"] - results["B"]["test_f1_macro"]
 
     st.markdown("<h3 style='margin-top:1.5rem'>Interpretation</h3>", unsafe_allow_html=True)
+    nlp_effect = "improves" if nlp_delta > 0 else "changes"
     st.markdown(
         f'<div class="glass-card" style="line-height:1.8;color:#94a3b8;font-size:0.9rem">'
 
-        f'<p><b style="color:#8b5cf6">NLP contribution (+{nlp_delta:.4f} F1):</b> '
-        f'Adding FinBERT + VADER sentiment features improves Test F1 from '
+        f'<p><b style="color:#8b5cf6">NLP contribution ({nlp_delta:+.4f} F1):</b> '
+        f'Adding FinBERT + VADER sentiment features {nlp_effect} Test F1 from '
         f'{results["A"]["test_f1_macro"]:.4f} to {results["B"]["test_f1_macro"]:.4f}. '
-        f'While the magnitude is modest, it is consistent across CV folds, suggesting '
+        f'While the magnitude is modest, this suggests '
         f'that financial news sentiment captures information not fully reflected in '
         f'technical indicators. The small effect size is expected: most trading days '
         f'rely on sector-level sentiment fallback due to sparse per-ticker news coverage '
@@ -365,7 +375,7 @@ def render() -> None:
 
         f'<p><b style="color:#60a5fa">Market efficiency implication:</b> '
         f'The overall F1 of ~0.50 for 5-day binary prediction is consistent with '
-        f'the semi-strong form of the Efficient Market Hypothesis — public information '
+        f'the semi-strong form of the Efficient Market Hypothesis â€” public information '
         f'(technical indicators, news) provides limited but non-zero predictive signal '
         f'at the weekly horizon. The marginal NLP contribution suggests markets are '
         f'not perfectly efficient at incorporating news sentiment in the short term.</p>'
@@ -381,7 +391,7 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    # ── Disclaimer ───────────────────────────────────────────────────────────
+    # â”€â”€ Disclaimer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     st.markdown(
         "<p class='disclaimer'>"
         "All evaluations use a strict temporal split with no data leakage. "

@@ -34,19 +34,19 @@ All models evaluated on held-out **2025 test data** (temporal split, no leakage)
 
 | Config | Features | # Features | Best Model | CV F1 ± std | Test F1 | Test Acc | Δ vs Baseline |
 |--------|----------|-----------|------------|:-----------:|:-------:|:--------:|:-------------:|
-| **A** | Market only | 28 | LightGBM | 0.509 ± 0.022 | 0.4892 | 0.4898 | — |
-| **B** | Market + NLP | 56 | LightGBM | 0.513 ± 0.015 | 0.4852 | 0.4861 | -0.0040 |
-| **C** | Market + NLP + CV | 66 | LightGBM | 0.505 ± 0.023 | **0.4908** | 0.4911 | +0.0016 |
+| **A** | Market only | 28 | LightGBM | 0.509 ± 0.016 | **0.4970** | **0.4971** | — |
+| **B** | Market + NLP | 56 | LightGBM | 0.510 ± 0.027 | 0.4826 | 0.4842 | -0.0143 |
+| **C** | Market + NLP + CV | 66 | LightGBM | 0.511 ± 0.018 | 0.4861 | 0.4863 | -0.0109 |
 
-**Interpretation:** ~0.50 F1 remains a realistic ceiling for direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. NLP shows mixed impact under sparse coverage; CV adds a modest positive lift when combined with market features.
+**Interpretation:** ~0.50 F1 remains a realistic ceiling for direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. In this latest run, Config A is strongest on test; NLP and CV remain valuable as integrated modalities and interaction channels, but do not improve headline test F1 in this split.
 
 **Selection protocol:** Best model per config is chosen by **validation F1 only** (2024H2). The **test set (2025)** is evaluated once for final reporting.
 
 | Modality | Contribution | Why it works |
 |----------|-------------|--------------|
 | Market (ML) | Baseline | Technical indicators capture momentum, volatility, mean-reversion regimes |
-| NLP | -0.0040 F1 vs A | Sentiment *changes* can lead price, but coverage remains sparse even with fallback |
-| CV | +0.0016 F1 vs A (+0.0056 vs B) | Fine-tuned EfficientNet-B0 captures visual patterns complementary to indicators |
+| NLP | -0.0143 F1 vs A | Sentiment *changes* can lead price, but coverage remains sparse even with fallback |
+| CV | -0.0109 F1 vs A (+0.0035 vs B) | Fine-tuned EfficientNet-B0 captures visual patterns complementary to indicators; in this run the net effect remains below baseline A |
 
 ### Multi-Horizon Comparison
 
@@ -54,7 +54,7 @@ The app also supports a **21-day prediction horizon** (Config C equivalent, 61 f
 
 | Horizon | Features | Test F1 | Test Acc | Test Rows |
 |---------|----------|:-------:|:--------:|:---------:|
-| **5-day** | 66 (Config C) | **0.4908** | 0.4911 | 20,033 |
+| **5-day** | 66 (Config C) | **0.4861** | 0.4863 | 20,033 |
 | **21-day** | 61 (Config C) | 0.4961 | 0.4989 | 18,961 |
 
 **Finding:** The EMH ceiling (~0.50 F1) holds consistently across both prediction horizons, confirming that the signal limitation is structural rather than specific to the 5-day window. The 21-day model offers slightly higher recall on DOWN predictions (0.65 vs 0.59), suggesting chart patterns carry more signal over longer windows.
@@ -90,7 +90,7 @@ FEATURE EXTRACTION
 UNIFIED FEATURE MATRIX (per ticker-date)
 ├── Config A: 28 features  (market only)
 ├── Config B: 56 features  (+ NLP)
-└── Config C: 66 features  (+ CV)      ← best performing
+└── Config C: 66 features  (+ CV)      ← full multimodal configuration
 
 MODEL TRAINING (identical split across all configs)
 ├── RandomForest       (GridSearch-tuned)
@@ -352,3 +352,16 @@ If a system like this were deployed at scale, consistent buy/sell signals from m
 - **Accuracy ceiling:** ~0.50 F1 on direction prediction is consistent with the semi-strong Efficient Market Hypothesis; public information is largely priced in by the time it enters this pipeline.
 - **Survivorship bias in evaluation:** the 2025 test set only includes tickers that survived and remained in the S&P 500, which may overstate reliability.
 - Past performance on the held-out 2025 test set does not guarantee future performance.
+
+---
+
+## Submission Evidence
+
+- GitHub repository: https://github.com/Scampoloni/financial-market-predictor
+- Live deployment URL: https://financial-market-predictorr.streamlit.app/
+- Filled documentation template: `docs/PROJECT_DOCUMENTATION_TEMPLATE_FILLED.md`
+- Requirements matrix (A-E): `docs/AE_REQUIREMENTS_MATRIX.md`
+- Final submission runbook: `docs/FINAL_SUBMISSION_RUNBOOK.md`
+- Final checklist: `ABGABE-CHECKLISTE.md`
+
+Submission-specific credentials (if any) must be submitted separately (e.g., Moodle) and must not be committed.

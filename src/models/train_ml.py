@@ -394,6 +394,11 @@ def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
         model_results["Stacking"] = {**stk_cv, **stk_val, "_model": stk_model}
         logger.info("  Stacking — CV F1: %.4f | Val F1: %.4f", stk_cv["cv_f1_mean"], stk_val["val_f1_macro"])
 
+        # ---- Evaluate every candidate once on test for transparent comparison ----
+        for model_name, mr in model_results.items():
+            test_metrics = evaluate_model(mr["_model"], X_test, y_test, prefix="test")
+            mr.update(test_metrics)
+
         # ---- Pick best model by validation F1 ----
         best_name = max(model_results, key=lambda k: model_results[k]["val_f1_macro"])
         best = model_results[best_name]
@@ -462,16 +467,18 @@ def print_ablation_table(results: dict) -> None:
     # Per-model breakdown
     print("\n" + "-" * 80)
     print("Per-Model Breakdown:")
-    print(f"{'Config':<10} {'Model':<14} {'CV F1':<18} {'Val F1':<10} {'Val Acc':<10}")
+    print(f"{'Config':<10} {'Model':<14} {'CV F1':<18} {'Val F1':<10} {'Val Acc':<10} {'Test F1':<10} {'Test Acc':<10}")
     print("-" * 80)
     for config, r in results.items():
         for model_name, mr in r.get("per_model", {}).items():
             cv_str = f"{mr['cv_f1_mean']:.4f} ± {mr['cv_f1_std']:.4f}"
             val_f1 = mr.get("val_f1_macro", float("nan"))
             val_acc = mr.get("val_accuracy", float("nan"))
+            test_f1 = mr.get("test_f1_macro", float("nan"))
+            test_acc = mr.get("test_accuracy", float("nan"))
             print(
                 f"Config {config:<4} {model_name:<14} {cv_str:<18} "
-                f"{val_f1:.4f}     {val_acc:.4f}"
+                f"{val_f1:.4f}     {val_acc:.4f}     {test_f1:.4f}     {test_acc:.4f}"
             )
     print("=" * 80)
 
