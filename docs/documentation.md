@@ -155,7 +155,7 @@ Total corpus: 8,552 headline-rows stored in `data/raw/news/`.
 - **Text preprocessing:** Lower-case normalisation; removal of boilerplate ticker mentions; deduplication by headline hash; 512-token truncation for FinBERT. See [`src/nlp/finbert_sentiment.py`](src/nlp/finbert_sentiment.py).
 - **Prompt design or retrieval setup:** No generative prompting for the sentiment pipeline. For the RAG chatbot ([`src/nlp/rag_chatbot.py`](src/nlp/rag_chatbot.py)): headlines are chunked and embedded with `sentence-transformers/all-MiniLM-L6-v2`; top-5 retrieved chunks are prepended to a Gemini API call. Coverage fallback hierarchy: ticker-level → sector-average → market-average → forward-fill (raises raw 1.7 % ticker-day coverage to ~59 %).
 - **Analyst data (5 additional features):** `analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside` — structured signals derived from analyst rating data, joined to the NLP feature matrix. Together with the 23 text-derived features this yields 28 NLP-block features total.
-- **PCA note:** FinBERT embedding PCA (10 components) is fitted on all rows with direct news coverage prior to the temporal train/test split ([`src/features/nlp_features.py`, lines 381–388](src/features/nlp_features.py#L381-L388)). As PCA is an unsupervised, label-free transformation, the resulting leakage is structural only (embedding covariance) and does not expose target labels to the test period.
+- **PCA note:** FinBERT embedding PCA (10 components) is fitted on training-period rows only (date ≤ 2024-06-30); val/test rows are transformed using the saved scaler/PCA without re-fitting ([`src/features/nlp_features.py`](src/features/nlp_features.py)). This eliminates any temporal leakage from test-period embedding distributions.
 
 #### 2B.3 Approach Selection
 
@@ -214,7 +214,7 @@ Fine-tuning script: [`scripts/finetune_cnn.py`](scripts/finetune_cnn.py).
 
 - **Image preprocessing:** 30-day OHLCV window rendered as a dark-background candlestick PNG (224×224 px) using mplfinance. Images are normalised with ImageNet mean/std before EfficientNet inference. See [`src/cv/chart_classifier.py`](src/cv/chart_classifier.py).
 - **Augmentation strategy:** No data augmentation during inference. During CNN fine-tuning (`scripts/finetune_cnn.py`): random horizontal flip, colour jitter (brightness/contrast ±0.2), random rotation ±5°. Augmentation is conservative to preserve chart semantics.
-- **PCA note:** EfficientNet embedding PCA (10 components) is fitted on all rows with chart coverage prior to the temporal train/test split ([`src/features/cv_features.py`, lines 198–199](src/features/cv_features.py#L198-L199)). As PCA is an unsupervised, label-free transformation, the resulting leakage is structural only (embedding covariance) and does not expose target labels to the test period.
+- **PCA note:** EfficientNet embedding PCA (10 components) is fitted on training-period rows only (date ≤ 2024-06-30); val/test rows are transformed using the saved scaler/PCA without re-fitting ([`src/features/cv_features.py`](src/features/cv_features.py)). This eliminates any temporal leakage from test-period embedding distributions.
 
 #### 2C.3 Model Selection
 
@@ -231,8 +231,21 @@ Fine-tuning script: [`scripts/finetune_cnn.py`](scripts/finetune_cnn.py).
 
 #### 2C.5 Evaluation and Error Analysis
 
-- **Metrics and/or visual checks:** Extrinsic: ablation Config B vs Config C on the 2025 test set. Qualitative: PCA embedding scatter plots coloured by direction label (see [`notebooks/04_cv_pipeline.ipynb`](notebooks/04_cv_pipeline.ipynb)).
-- **Final results:** Config C (Market + NLP + CV) test F1-macro = 0.4861 (+0.0035 vs Config B). Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlapping CIs across all configs confirm the marginal differences are not statistically significant.
+**Intrinsic (fine-tuning validation):**
+
+Fine-tuning validation metrics were not logged during `scripts/finetune_cnn.py` training (no validation split was used during fine-tuning). Qualitative visual inspection of the embedding space is available via PCA scatter plots in [`notebooks/04_cv_pipeline.ipynb`](notebooks/04_cv_pipeline.ipynb) — clusters show improved UP/DOWN separability after domain fine-tuning compared to frozen ImageNet weights.
+
+**Extrinsic (ablation on held-out test set):**
+
+| Config | Features | Test F1-macro | Δ vs Config B |
+|--------|----------|---------------|---------------|
+| B | Market + NLP (56 features) | 0.4826 | — |
+| C | Market + NLP + CV (66 features) | 0.4861 | +0.0035 |
+
+Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlapping CIs across configs indicate the marginal improvement is not statistically significant — CV features provide complementary signal but do not dominate.
+
+- **Metrics and/or visual checks:** Extrinsic ablation above; qualitative: PCA embedding scatter plots in [`notebooks/04_cv_pipeline.ipynb`](notebooks/04_cv_pipeline.ipynb); additional LightGBM-on-CV-only baseline (F1 ≈ 0.35, below random baseline) confirms CV embeddings are not sufficient alone.
+- **Final results:** Config C test F1-macro = 0.4861 (+0.0035 vs Config B without CV).
 - **Error patterns and limitations:** CV embeddings overlap strongly with existing technical indicators (RSI, MACD, Bollinger Bands already capture most visual candlestick information algebraically). Survivorship bias in the ticker universe (all currently-listed S&P 500 stocks) inflates historical win rates for UP predictions.
 
 #### 2C.6 Integration with Other Block(s)
