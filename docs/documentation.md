@@ -61,7 +61,7 @@ Reference to multiple lines in `train.py`, lines 15-38:
 - **Data and output flow between blocks:**
   ```
   Yahoo Finance OHLCV  →  [ML Block]  →  28 market features ──────────────────┐
-  RSS / NewsAPI text   →  [NLP Block] →  24 sentiment/embedding features ──────┼──► combined matrix ──► LightGBM ──► UP/DOWN probability
+  RSS / NewsAPI text   →  [NLP Block] →  28 sentiment/embedding features ──────┼──► combined matrix ──► LightGBM ──► UP/DOWN probability
   Candlestick PNGs     →  [CV Block]  →  10 PCA chart-embedding features ──────┘
   ```
 
@@ -154,6 +154,7 @@ Total corpus: 8,552 headline-rows stored in `data/raw/news/`.
 
 - **Text preprocessing:** Lower-case normalisation; removal of boilerplate ticker mentions; deduplication by headline hash; 512-token truncation for FinBERT. See [`src/nlp/finbert_sentiment.py`](src/nlp/finbert_sentiment.py).
 - **Prompt design or retrieval setup:** No generative prompting for the sentiment pipeline. For the RAG chatbot ([`src/nlp/rag_chatbot.py`](src/nlp/rag_chatbot.py)): headlines are chunked and embedded with `sentence-transformers/all-MiniLM-L6-v2`; top-5 retrieved chunks are prepended to a Gemini API call. Coverage fallback hierarchy: ticker-level → sector-average → market-average → forward-fill (raises raw 1.7 % ticker-day coverage to ~59 %).
+- **Analyst data (5 additional features):** `analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside` — structured signals derived from analyst rating data, joined to the NLP feature matrix. Together with the 23 text-derived features this yields 28 NLP-block features total.
 - **PCA note:** FinBERT embedding PCA (10 components) is fitted on all rows with direct news coverage prior to the temporal train/test split ([`src/features/nlp_features.py`, lines 381–388](src/features/nlp_features.py#L381-L388)). As PCA is an unsupervised, label-free transformation, the resulting leakage is structural only (embedding covariance) and does not expose target labels to the test period.
 
 #### 2B.3 Approach Selection
@@ -193,7 +194,7 @@ Config B (Market + NLP) test F1-macro = 0.4826 (−0.0143 vs Config A baseline).
 #### 2B.6 Integration with Other Block(s)
 
 - **Inputs received from other block(s):** Ticker symbol and date index from the ML block (used to align sentiment features temporally).
-- **Outputs provided to other block(s):** 24-feature NLP vector per (ticker, date), persisted in [`data/processed/features_nlp.parquet`](data/processed/features_nlp.parquet), concatenated with market features to produce the Config B/C feature matrix.
+- **Outputs provided to other block(s):** 28-feature NLP vector per (ticker, date) — 23 sentiment/embedding features plus 5 analyst-data features (`analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside`) — persisted in [`data/processed/features_nlp.parquet`](data/processed/features_nlp.parquet), concatenated with market features to produce the Config B/C feature matrix.
 
 ---
 
@@ -271,7 +272,7 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
   python -m src.data_collection.market_collector   # Download OHLCV from Yahoo Finance
   python -m src.data_collection.news_scraper       # Scrape RSS + NewsAPI headlines
   python -m src.features.market_features           # Build 28 market features
-  python -m src.features.nlp_features              # Build 24 NLP features (FinBERT + VADER)
+  python -m src.features.nlp_features              # Build 28 NLP features (FinBERT + VADER + analyst data)
   python -m src.data_collection.chart_generator --step 2   # Generate 61k candlestick PNGs
   python -m src.features.cv_features               # Extract EfficientNet embeddings + PCA
   ```

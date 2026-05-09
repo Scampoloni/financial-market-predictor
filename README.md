@@ -84,7 +84,7 @@ DATA COLLECTION
 
 FEATURE EXTRACTION
 ├── Market block  : 28 technical indicators + sector encoding       → 28 features
-├── NLP block     : FinBERT + VADER + embedding PCA + analyst data  → 24 features
+├── NLP block     : FinBERT + VADER + embedding PCA + analyst data  → 28 features
 └── CV block      : Fine-tuned EfficientNet-B0 → 1280-dim → PCA    → 10 features
 
 UNIFIED FEATURE MATRIX (per ticker-date)
@@ -162,8 +162,8 @@ financial-market-predictor/
 ### Market Block (28 features)
 Returns (1d/5d/20d), RSI-14, MACD (line/signal/histogram), SMA-20/SMA-50/EMA-12 ratios, Bollinger Bands (upper/lower/width), ATR-14, 20-day volatility, volume ratio, VIX level, day-of-week and month cyclical encoding (sin/cos), sector one-hot dummies.
 
-### NLP Block (24 features)
-FinBERT compound score + confidence, VADER compound score, news volume (1d/5d rolling), headline length, 10 FinBERT embedding PCA components, sentiment momentum, sentiment dispersion, 3-day sentiment shift, sentiment surprise (z-score vs 20-day baseline), sentiment × volume interaction, news volume z-score, imputation flag.
+### NLP Block (28 features)
+FinBERT compound score + confidence, VADER compound score, news volume (1d/5d rolling), headline length, 10 FinBERT embedding PCA components, sentiment momentum, sentiment dispersion, 3-day sentiment shift, sentiment surprise (z-score vs 20-day baseline), sentiment × volume interaction, news volume z-score, imputation flag. Plus 5 analyst-data features: analyst consensus score, analyst coverage count, sentiment momentum from analyst revisions, upgrade/downgrade score, price target upside.
 
 **Coverage strategy:** ticker-level → sector-average fallback → market-average fallback → forward-fill. Raises raw 1.7% coverage to ~59%.
 
