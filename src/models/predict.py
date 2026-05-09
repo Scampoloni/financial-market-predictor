@@ -20,11 +20,13 @@ import numpy as np
 import pandas as pd
 
 from src.config import (
+    FEATURES_NLP_PATH,
     LIVE_DATA_LOOKBACK_DAYS,
     MODEL_21D_PATH,
     MODELS_DIR,
     PCA_CV_PATH,
     PCA_NLP_PATH,
+    RAW_NEWS_DIR,
     STACKING_MODEL_PATH,
 )
 
@@ -165,13 +167,48 @@ class LivePredictor:
         nlp_feat["finbert_confidence"] = float(fb["finbert_confidence"].mean())
         nlp_feat["vader_sentiment"] = float(vd["vader_compound"].mean())
         nlp_feat["news_volume_1d"] = float(len(texts))
-        nlp_feat["news_volume_5d"] = float(len(texts))
         nlp_feat["headline_avg_length"] = float(
             pd.Series(texts).str.split().str.len().mean()
         )
         nlp_feat["sentiment_dispersion"] = float(fb["finbert_score"].std())
-        nlp_feat["sentiment_momentum"] = nlp_feat["finbert_sentiment"]
         nlp_feat["is_sentiment_imputed"] = 0.0
+        # Trivial interaction — no historical data needed
+        nlp_feat["sentiment_x_volume"] = nlp_feat["finbert_sentiment"] * nlp_feat["news_volume_1d"]
+
+        # Rolling features from pre-computed NLP parquet history
+        today_sentiment = nlp_feat["finbert_sentiment"]
+        today_volume = nlp_feat["news_volume_1d"]
+        try:
+            nlp_hist = pd.read_parquet(FEATURES_NLP_PATH)
+            ticker_hist = nlp_hist[nlp_hist["ticker"] == ticker].sort_index()
+            if not ticker_hist.empty:
+                # news_volume_5d: rolling 5-day count from history + today
+                vol_series = ticker_hist["news_volume_1d"].tail(5)
+                nlp_feat["news_volume_5d"] = float(vol_series.sum()) + today_volume
+                # sentiment_momentum: difference from 5 days ago
+                if len(ticker_hist) >= 5:
+                    nlp_feat["sentiment_momentum"] = today_sentiment - float(
+                        ticker_hist["finbert_sentiment"].iloc[-5]
+                    )
+                # sentiment_shift_3d: difference from 3 days ago
+                if len(ticker_hist) >= 3:
+                    nlp_feat["sentiment_shift_3d"] = today_sentiment - float(
+                        ticker_hist["finbert_sentiment"].iloc[-3]
+                    )
+                # news_volume_zscore: z-score of today's count vs 20-day rolling
+                if len(ticker_hist) >= 5:
+                    vol20 = ticker_hist["news_volume_1d"].tail(20)
+                    vol_mean, vol_std = float(vol20.mean()), float(vol20.std())
+                    nlp_feat["news_volume_zscore"] = (today_volume - vol_mean) / (vol_std + 1e-8)
+                # sentiment_surprise: z-score of today's sentiment vs 20-day rolling
+                if len(ticker_hist) >= 5:
+                    sent20 = ticker_hist["finbert_sentiment"].tail(20)
+                    sent_mean, sent_std = float(sent20.mean()), float(sent20.std())
+                    nlp_feat["sentiment_surprise"] = (today_sentiment - sent_mean) / (sent_std + 1e-8)
+            else:
+                nlp_feat["news_volume_5d"] = today_volume
+        except Exception:
+            nlp_feat["news_volume_5d"] = today_volume
 
         # PCA embeddings
         embed_cols = [c for c in fb.columns if c.startswith("embed_")]
