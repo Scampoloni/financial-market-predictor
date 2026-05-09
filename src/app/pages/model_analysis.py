@@ -266,7 +266,8 @@ def render() -> None:
         st.markdown(
             '<p style="color:#475569;font-size:0.8rem;margin-top:6px">'
             '&#9733; = best model per config (selected by validation F1). '
-            'Stacking uses KFold internally (TimeSeriesSplit incompatible), which may explain lower performance.</p>',
+            'Stacking CV score = held-out validation F1 (TimeSeriesSplit KFold CV not applicable); '
+            'RF and LightGBM CV scores are true 5-fold TimeSeriesSplit means.</p>',
             unsafe_allow_html=True,
         )
 
