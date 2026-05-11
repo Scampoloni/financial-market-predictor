@@ -97,6 +97,26 @@ Data collection: [`src/data_collection/market_collector.py`](src/data_collection
 
 See *Feature Engineering* in [`notebooks/02_ml_baseline.ipynb`](notebooks/02_ml_baseline.ipynb).
 
+**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, SIDEWAYS observations are excluded and the task is reduced to binary UP / DOWN classification. This halves noise and raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py`](src/features/market_features.py) for the target construction logic.
+
+#### EDA Key Findings
+
+Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb). Summary of key findings that drove modelling decisions:
+
+| Finding | Value | Implication for modelling |
+|---------|-------|--------------------------|
+| Dataset scale | 97,351 ticker-day rows; 67 tickers, 7 sectors, 2020–2025 | Sufficient for robust ML across multiple market regimes |
+| Dataset start | 2020-03-13 (not 2020-01-01) | SMA-50 warm-up consumes first ~50 trading days — rows dropped intentionally |
+| Missing values | 0 % across all feature columns | No imputation required before training |
+| Return kurtosis | 13.05 (Gaussian = 3) | Fat tails → classification preferred over regression; tree models preferred |
+| Target distribution | UP 43.1 %, DOWN 33.9 %, SIDEWAYS 23.1 % | S&P 500 upward drift; macro-F1 + class weights required |
+| Feature–target correlations | All \|r\| < 0.2 | No dominant linear signal — non-linear model (LightGBM) required |
+| SMA ratio inter-correlation | ~0.85–0.95 (sma\_20, sma\_50, ema\_12) | Redundant for trees; kept — LightGBM handles collinearity internally |
+| High-VIX periods → UP rate | 50.1 % (vs 43.1 % base rate) | VIX captures snap-back rallies; kept as continuous feature |
+| RSI < 30 → UP rate | 52.1 % (vs 43.1 % base rate) | Strong mean-reversion signal: 8–11 pp above base rate |
+| Extreme moves (>\|10 %\|) | 455 rows (0.47 %) | Real market events — kept; tree models are robust to outliers via rank splits |
+| Panel balance | Exactly 1,453 rows per ticker (Std = 0.0) | Perfect panel — no ticker-specific data gaps |
+
 #### 2A.3 Model Selection
 
 - **Models tested:** RandomForest (GridSearchCV), LightGBM (Optuna, 40 trials), StackingClassifier (RF + XGB + LGB meta-ensemble).
@@ -108,8 +128,8 @@ See [`src/models/train_ml.py`](src/models/train_ml.py) for training logic and [`
 
 | Iteration | Objective | Key changes | Models used | Main metric | Change vs previous |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Establish baseline with raw OHLCV | 3-class target (UP/DOWN/SIDEWAYS), next-day horizon | RandomForest | CV F1-macro ≈ 0.33 | — |
-| 2 | Improve signal-to-noise | Switch to binary 5-day target; add technical indicators (RSI, MACD, Bollinger) | RandomForest, XGBoost | CV F1-macro ≈ 0.49 | +0.16 |
+| 1 | Establish baseline with raw OHLCV | 3-class target (UP / DOWN / SIDEWAYS where \|5-day return\| ≤ 1 %), next-day horizon | RandomForest | CV F1-macro ≈ 0.33 | — |
+| 2 | Improve signal-to-noise | **SIDEWAYS rows dropped** (±1 % threshold produced ~23 % neutral rows with little predictive structure); switch to binary 5-day UP/DOWN; add technical indicators (RSI, MACD, Bollinger) | RandomForest, XGBoost | CV F1-macro ≈ 0.49 | +0.16 |
 | 3 | Systematic hyperparameter optimisation | Optuna tuning for LightGBM; TimeSeriesSplit CV; Stacking ensemble | RF, LightGBM, Stacking | Test F1-macro = 0.4970 (LightGBM best) | +0.007 vs iteration 2 |
 
 See *Model Comparison* in [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
@@ -146,14 +166,29 @@ Ablation results stored in [`data/processed/ablation_results.json`](data/process
 | 1 | RSS financial news feeds (Yahoo Finance, Reuters, CNBC, Seeking Alpha) | Unstructured text (headlines) | ~6,200 headlines across 67 tickers | Primary sentiment signal |
 | 2 | [NewsAPI](https://newsapi.org) | Unstructured text (headlines + snippets) | ~2,350 additional headlines | Supplementary coverage for low-news tickers |
 | 3 | [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert) (HuggingFace) | Pre-trained transformer model | ~440 MB | Sentiment scoring model |
+| 4 | [Yahoo Finance via yfinance](https://finance.yahoo.com) — `ticker.upgrades_downgrades` + `ticker.recommendations` | Analyst rating time series (structured) | 67 tickers × ~1,453 dates; historical firm-level upgrades/downgrades + monthly consensus counts | 5 analyst features: `analyst_consensus`, `analyst_upgrade_score`, `analyst_coverage_count`, `price_target_upside`, `analyst_sentiment_momentum` |
 
 News collection: [`src/data_collection/news_scraper.py`](src/data_collection/news_scraper.py).  
+Analyst feature builder: [`src/data_collection/build_analyst_features.py`](src/data_collection/build_analyst_features.py).  
 Total corpus: 8,552 headline-rows stored in `data/raw/news/`.
 
 #### 2B.2 Preprocessing and Prompt Design
 
 - **Text preprocessing:** Lower-case normalisation; removal of boilerplate ticker mentions; deduplication by headline hash; 512-token truncation for FinBERT. See [`src/nlp/finbert_sentiment.py`](src/nlp/finbert_sentiment.py).
-- **Prompt design or retrieval setup:** No generative prompting for the sentiment pipeline. For the RAG chatbot ([`src/nlp/rag_chatbot.py`](src/nlp/rag_chatbot.py)): headlines are chunked and embedded with `sentence-transformers/all-MiniLM-L6-v2`; top-5 retrieved chunks are prepended to a Gemini API call. Coverage fallback hierarchy: ticker-level → sector-average → market-average → forward-fill (raises raw 1.7 % ticker-day coverage to ~59 %).
+- **Prompt design or retrieval setup:** No generative prompting for the sentiment pipeline. For the RAG chatbot ([`src/nlp/rag_chatbot.py`](src/nlp/rag_chatbot.py)): headlines are chunked and embedded with `sentence-transformers/all-MiniLM-L6-v2`; top-5 retrieved chunks are prepended to a Gemini API call. Coverage fallback hierarchy: ticker-level → sector-average → market-average → forward-fill.
+
+  **NLP sentiment coverage by fallback tier** (out of 97,351 total ticker-day rows):
+
+  | Tier | Source | Approx. ticker-day coverage |
+  |------|--------|:---------------------------:|
+  | 1 — Direct ticker news | Ticker-specific RSS/NewsAPI headlines | ~1.7 % |
+  | 2 — Sector fallback | Mean FinBERT/VADER score across same-sector tickers on that day | ~35 % |
+  | 3 — Market fallback | Mean score across all tickers on that day (used when no sector news) | ~22 % |
+  | 4 — Forward-fill | Last non-null sentiment value carried forward | ~41 % |
+  | **Total with signal** | Tiers 1–4 combined | **~100 %** |
+
+  Rows that rely on tier 2–4 are flagged by `is_sentiment_imputed = 1` in the NLP feature matrix. The net effect: Config B achieves complete row coverage but with a weak, aggregated signal for the majority of observations — the primary reason NLP adds noise rather than predictive lift (−0.0143 F1 vs Config A).
+
 - **Analyst data (5 additional features):** `analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside` — structured signals derived from analyst rating data, joined to the NLP feature matrix. Together with the 23 text-derived features this yields 28 NLP-block features total.
 - **PCA note:** FinBERT embedding PCA (10 components) is fitted on training-period rows only (date ≤ 2024-06-30); val/test rows are transformed using the saved scaler/PCA without re-fitting ([`src/features/nlp_features.py`](src/features/nlp_features.py)). This eliminates any temporal leakage from test-period embedding distributions.
 
@@ -233,7 +268,16 @@ Fine-tuning script: [`scripts/finetune_cnn.py`](scripts/finetune_cnn.py).
 
 **Intrinsic (fine-tuning validation):**
 
-Fine-tuning validation metrics were not logged during `scripts/finetune_cnn.py` training (no validation split was used during fine-tuning). Qualitative visual inspection of the embedding space is available via PCA scatter plots in [`notebooks/04_cv_pipeline.ipynb`](notebooks/04_cv_pipeline.ipynb) — clusters show improved UP/DOWN separability after domain fine-tuning compared to frozen ImageNet weights.
+`scripts/finetune_cnn.py` uses a stratified 85 / 15 train–val split and reports per-epoch validation accuracy and macro F1. The best checkpoint (by val F1) is written to `models/cnn_finetuned.pth` with its metric persisted inside the file.
+
+| Split | Samples | Best val F1-macro | Epochs |
+|-------|---------|:-----------------:|:------:|
+| Train | 36,960 | — | 10 |
+| Val | ~6,522 | **0.538** | best at checkpoint |
+
+Fine-tuning training strategy: head-only for epochs 1–3 (lr = 1e-3), then top-2 EfficientNet blocks unfrozen for epochs 4–10 (backbone lr = 3e-5, head lr = 1e-3). Class weights applied to CrossEntropyLoss to handle UP/DOWN imbalance.
+
+Qualitative PCA scatter plots of embeddings (frozen vs fine-tuned) are available in [`notebooks/04_cv_pipeline.ipynb`](notebooks/04_cv_pipeline.ipynb) — clusters show improved UP/DOWN separability after domain adaptation.
 
 **Extrinsic (ablation on held-out test set):**
 
@@ -260,7 +304,7 @@ Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlappin
 - **Deployment URL:** https://financial-market-predictorr.streamlit.app/
 - **Main user flow:**
   1. User selects a ticker and date range on the **Prediction** page.
-  2. App loads pre-computed artifacts (`models/stacking_final.pkl`, `data/processed/features_combined.parquet`) and returns a directional probability (UP/DOWN) with a Plotly candlestick chart.
+  2. App loads pre-computed artifacts — `models/stacking_final.pkl` (contains the best-performing model, LightGBM in all configs, plus its feature column list; the filename is kept for backwards compatibility), `data/processed/features_market.parquet`, `data/processed/features_nlp.parquet`, and `data/processed/features_cv.parquet` — and returns a directional UP/DOWN probability with a Plotly candlestick chart. Live inference assembles features on-the-fly using `src/models/predict.py`; no `features_combined.parquet` is required.
   3. User can explore per-block evidence on the **Analysis** page (SHAP feature importance, ablation bar chart).
   4. User can query the **News Chat** tab (RAG chatbot) for contextual news evidence behind any prediction.
 - **Screenshot or short demo:** See [`docs/screenshots/01_prediction_flow.png`](docs/screenshots/01_prediction_flow.png), [`docs/screenshots/02_model_analysis.png`](docs/screenshots/02_model_analysis.png), [`docs/screenshots/03_nlp_cv_integration.png`](docs/screenshots/03_nlp_cv_integration.png).
