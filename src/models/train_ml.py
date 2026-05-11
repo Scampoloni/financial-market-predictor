@@ -239,12 +239,18 @@ def train_stacking(
     y_train: pd.Series,
     tscv: TimeSeriesSplit,
     lgb_params: dict | None = None,
+    X_val: pd.DataFrame | None = None,
+    y_val: pd.Series | None = None,
 ) -> tuple[StackingClassifier, dict]:
     """Train Stacking ensemble (RF + XGB + LGB → LogisticRegression meta).
 
     Uses cv=5 (KFold) internally for stacking cross-val predictions,
     since TimeSeriesSplit doesn't produce full partitions required by
     StackingClassifier. External evaluation still uses tscv.
+
+    cv_f1_mean is reported as the validation-set F1 (when X_val/y_val are
+    provided) rather than a training-set proxy, so it is comparable to the
+    TimeSeriesSplit CV scores of RF and LightGBM.
     """
     lgb_params = lgb_params or {}
 
@@ -279,19 +285,27 @@ def train_stacking(
     logger.info("Training Stacking ensemble (fit only, no outer CV) ...")
     model.fit(X_train, y_train)
 
-    # Compute CV scores with tscv for consistency with other models
-    # But stacking CV is very slow, so we only report fit metrics
-    # Use training set predictions as proxy for CV
     from sklearn.metrics import f1_score as f1_fn, accuracy_score as acc_fn
-    y_train_pred = model.predict(X_train)
-    train_f1 = float(f1_fn(y_train, y_train_pred, average="macro"))
-    train_acc = float(acc_fn(y_train, y_train_pred))
+
+    if X_val is not None and y_val is not None:
+        # Use held-out validation F1 so the CV column is comparable across models.
+        # TimeSeriesSplit CV is not feasible for StackingClassifier (KFold required
+        # internally), so val F1 is the best available proxy.
+        val_f1 = float(f1_fn(y_val, model.predict(X_val), average="macro"))
+        val_acc = float(acc_fn(y_val, model.predict(X_val)))
+        cv_f1_mean, cv_acc_mean, fold_f1 = val_f1, val_acc, [val_f1]
+    else:
+        # Fallback: training-set proxy (biased upward — prefer passing X_val).
+        y_train_pred = model.predict(X_train)
+        cv_f1_mean = float(f1_fn(y_train, y_train_pred, average="macro"))
+        cv_acc_mean = float(acc_fn(y_train, y_train_pred))
+        fold_f1 = [cv_f1_mean]
 
     return model, {
-        "cv_f1_mean": train_f1,
-        "cv_f1_std": 0.0,
-        "cv_acc_mean": train_acc,
-        "fold_f1": [train_f1],
+        "cv_f1_mean": cv_f1_mean,
+        "cv_f1_std": 0.0,  # Stacking: no TimeSeriesSplit CV possible; val F1 used as proxy
+        "cv_acc_mean": cv_acc_mean,
+        "fold_f1": fold_f1,
     }
 
 
@@ -389,7 +403,10 @@ def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
 
         # 3) Stacking (RF + XGB + LGB)
         logger.info("Config %s: training Stacking ...", config)
-        stk_model, stk_cv = train_stacking(X_train, y_train, tscv, lgb_params=lgb_params)
+        stk_model, stk_cv = train_stacking(
+            X_train, y_train, tscv, lgb_params=lgb_params,
+            X_val=X_val, y_val=y_val,
+        )
         stk_val = evaluate_model(stk_model, X_val, y_val, prefix="val")
         model_results["Stacking"] = {**stk_cv, **stk_val, "_model": stk_model}
         logger.info("  Stacking — CV F1: %.4f | Val F1: %.4f", stk_cv["cv_f1_mean"], stk_val["val_f1_macro"])
@@ -428,11 +445,17 @@ def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
             best_test["test_f1_macro"], best_test["test_accuracy"],
         )
 
-        # Save Config C best model as production model
+        # Save Config C best model as production model.
+        # Filename is stacking_final.pkl for backwards compatibility (app + predict.py hardcode it),
+        # but the actual winner may be LightGBM or RandomForest — check best_model_type.
         if config == "C":
             MODELS_DIR.mkdir(parents=True, exist_ok=True)
             with open(STACKING_MODEL_PATH, "wb") as f:
-                pickle.dump({"model": best_model, "feature_cols": feature_cols}, f)
+                pickle.dump({
+                    "model": best_model,
+                    "feature_cols": feature_cols,
+                    "best_model_type": best_name,
+                }, f)
             logger.info("Config C best model (%s) saved to %s", best_name, STACKING_MODEL_PATH)
 
     # Save results (without _model objects)

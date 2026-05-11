@@ -142,11 +142,15 @@ def build_all_cv_features(
     market_path: Path = FEATURES_MARKET_PATH,
     output_path: Path = FEATURES_CV_PATH,
     n_pca: int = CV_PCA_COMPONENTS,
+    train_cutoff: str = "2024-06-30",
 ) -> pd.DataFrame:
     """Build the full CV feature matrix for all tickers and save to Parquet.
 
     Runs EfficientNet-B0 on all chart images, fits PCA on covered rows,
     and saves the result.
+
+    The PCA scaler/transform is fitted on training-period rows only
+    (date <= train_cutoff) to prevent temporal leakage into val/test.
 
     Args:
         tickers: List of ticker symbols.
@@ -191,12 +195,29 @@ def build_all_cv_features(
         n_pca, n_chart_rows, len(combined),
     )
 
-    if n_chart_rows >= n_pca and all_embeddings:
-        embed_matrix = combined.loc[rows_with_chart, embed_cols].fillna(0).values
+    # Fit scaler/PCA on training-period rows only to avoid temporal leakage.
+    train_mask = rows_with_chart & (combined.index <= train_cutoff)
+    n_train_chart = train_mask.sum()
+    fit_mask = train_mask if n_train_chart >= n_pca else rows_with_chart
+    if fit_mask.sum() >= n_pca and all_embeddings:
+        if n_train_chart < n_pca:
+            logger.warning(
+                "Too few train-period chart rows (%d) for PCA fit — falling back to all chart rows.",
+                n_train_chart,
+            )
+        else:
+            logger.info(
+                "Fitting PCA on %d train-period chart rows (of %d chart rows / %d total) ...",
+                n_train_chart, n_chart_rows, len(combined),
+            )
         scaler = StandardScaler()
-        embed_scaled = scaler.fit_transform(embed_matrix)
+        embed_matrix_fit = combined.loc[fit_mask, embed_cols].fillna(0).values
+        scaler.fit(embed_matrix_fit)
         pca = PCA(n_components=n_pca, random_state=42)
-        pca_result = pca.fit_transform(embed_scaled)
+        pca.fit(scaler.transform(embed_matrix_fit))
+        # Transform ALL chart rows (train + val + test) using the fitted scaler/PCA
+        embed_matrix_all = combined.loc[rows_with_chart, embed_cols].fillna(0).values
+        pca_result = pca.transform(scaler.transform(embed_matrix_all))
 
         for i in range(n_pca):
             combined.loc[rows_with_chart, f"chart_embed_pca_{i+1}"] = pca_result[:, i]

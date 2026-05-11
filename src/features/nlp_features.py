@@ -320,6 +320,7 @@ def build_all_nlp_features(
     market_path: Path = FEATURES_MARKET_PATH,
     output_path: Path = FEATURES_NLP_PATH,
     n_pca: int = NLP_PCA_COMPONENTS,
+    train_cutoff: str = "2024-06-30",
 ) -> pd.DataFrame:
     """Build the full NLP feature matrix for all tickers and save to Parquet.
 
@@ -327,12 +328,16 @@ def build_all_nlp_features(
     applies sector/market fallback for coverage, adds dynamic features,
     fits PCA on CLS embeddings, and saves the result.
 
+    The PCA scaler/transform is fitted on training-period rows only
+    (date <= train_cutoff) to prevent temporal leakage into val/test.
+
     Args:
         tickers: List of ticker symbols.
         news_dir: Directory with raw news Parquet files.
         market_path: Market features path for date alignment.
         output_path: Output Parquet path.
         n_pca: Number of PCA dimensions for embedding features.
+        train_cutoff: Last date (inclusive) of the training period for PCA fit.
 
     Returns:
         Combined NLP feature DataFrame.
@@ -369,21 +374,33 @@ def build_all_nlp_features(
     embed_cols = [c for c in combined.columns if c.startswith("embed_")]
     if embed_cols:
         rows_with_news = combined["news_volume_1d"] > 0
+        # Fit scaler/PCA on training-period rows only to avoid temporal leakage.
+        train_mask = rows_with_news & (combined.index <= train_cutoff)
+        n_train_news = train_mask.sum()
         n_news_rows = rows_with_news.sum()
         logger.info(
-            "Fitting PCA (%d dims) on %d rows with news coverage (of %d total) ...",
-            n_pca, n_news_rows, len(combined),
+            "Fitting PCA (%d dims) on %d train rows with news (of %d news rows / %d total) ...",
+            n_pca, n_train_news, n_news_rows, len(combined),
         )
         # Initialise PCA columns to zero for all rows
         for i in range(n_pca):
             combined[f"finbert_embed_pca_{i+1}"] = 0.0
 
-        if n_news_rows >= n_pca:
+        fit_mask = train_mask if n_train_news >= n_pca else rows_with_news
+        if fit_mask.sum() >= n_pca:
+            if n_train_news < n_pca:
+                logger.warning(
+                    "Too few train-period news rows (%d) for PCA fit — falling back to all news rows.",
+                    n_train_news,
+                )
             scaler = StandardScaler()
-            embed_matrix = combined.loc[rows_with_news, embed_cols].fillna(0).values
-            embed_scaled = scaler.fit_transform(embed_matrix)
+            embed_matrix_fit = combined.loc[fit_mask, embed_cols].fillna(0).values
+            scaler.fit(embed_matrix_fit)
             pca = PCA(n_components=n_pca, random_state=42)
-            pca_result = pca.fit_transform(embed_scaled)
+            pca.fit(scaler.transform(embed_matrix_fit))
+            # Transform ALL rows with news (train + val + test) using the fitted scaler/PCA
+            embed_matrix_all = combined.loc[rows_with_news, embed_cols].fillna(0).values
+            pca_result = pca.transform(scaler.transform(embed_matrix_all))
             for i in range(n_pca):
                 combined.loc[rows_with_news, f"finbert_embed_pca_{i+1}"] = pca_result[:, i]
             explained = pca.explained_variance_ratio_.sum() * 100

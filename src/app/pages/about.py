@@ -190,7 +190,7 @@ def render() -> None:
     with st.expander("📊 Market Block — 28 features", expanded=False):
         _glossary_rows(_MARKET_FEATURES, "#4a90d9")
 
-    with st.expander("📰 NLP Block — 24 features", expanded=False):
+    with st.expander("📰 NLP Block — 28 features", expanded=False):
         _glossary_rows(_NLP_FEATURES, "#8b5cf6")
 
     with st.expander("📈 CV Block — 10 features", expanded=False):
