@@ -359,9 +359,6 @@ If a system like this were deployed at scale, consistent buy/sell signals from m
 
 - GitHub repository: https://github.com/Scampoloni/financial-market-predictor
 - Live deployment URL: https://financial-market-predictorr.streamlit.app/
-- Filled documentation template: `docs/PROJECT_DOCUMENTATION_TEMPLATE_FILLED.md`
-- Requirements matrix (A-E): `docs/AE_REQUIREMENTS_MATRIX.md`
-- Final submission runbook: `docs/FINAL_SUBMISSION_RUNBOOK.md`
-- Final checklist: `ABGABE-CHECKLISTE.md`
+- Filled documentation template: `docs/documentation.md`
 
 Submission-specific credentials (if any) must be submitted separately (e.g., Moodle) and must not be committed.

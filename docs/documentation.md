@@ -109,7 +109,7 @@ Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 | Dataset start | 2020-03-13 (not 2020-01-01) | SMA-50 warm-up consumes first ~50 trading days — rows dropped intentionally |
 | Missing values | 0 % across all feature columns | No imputation required before training |
 | Return kurtosis | 13.05 (Gaussian = 3) | Fat tails → classification preferred over regression; tree models preferred |
-| Target distribution | UP 43.1 %, DOWN 33.9 %, SIDEWAYS 23.1 % | S&P 500 upward drift; macro-F1 + class weights required |
+| Target distribution | UP 43.1 %, DOWN 33.9 %, SIDEWAYS 23.0 % | S&P 500 upward drift; macro-F1 + class weights required |
 | Feature–target correlations | All \|r\| < 0.2 | No dominant linear signal — non-linear model (LightGBM) required |
 | SMA ratio inter-correlation | ~0.85–0.95 (sma\_20, sma\_50, ema\_12) | Redundant for trees; kept — LightGBM handles collinearity internally |
 | High-VIX periods → UP rate | 50.1 % (vs 43.1 % base rate) | VIX captures snap-back rallies; kept as continuous feature |
@@ -170,7 +170,7 @@ Ablation results stored in [`data/processed/ablation_results.json`](data/process
 
 News collection: [`src/data_collection/news_scraper.py`](src/data_collection/news_scraper.py).  
 Analyst feature builder: [`src/data_collection/build_analyst_features.py`](src/data_collection/build_analyst_features.py).  
-Total corpus: 8,552 headline-rows stored in `data/raw/news/`.
+Total corpus: ~8,550 headline-rows stored in `data/raw/news/`.
 
 #### 2B.2 Preprocessing and Prompt Design
 
