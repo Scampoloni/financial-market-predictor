@@ -314,6 +314,9 @@ python -m src.models.train_ml --config C
 
 # Restore full dataset
 python scripts/use_smoke_data.py --restore
+
+# Run test suite (68 tests — no downloads required)
+pytest tests/ -q
 ```
 
 ---
