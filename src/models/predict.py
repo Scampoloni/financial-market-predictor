@@ -119,7 +119,7 @@ class LivePredictor:
 
         if ohlcv_df is None:
             ohlcv_df = self.fetch_ohlcv(ticker)
-        feat = build_ticker_features(ticker, raw_df=ohlcv_df)
+        feat = build_ticker_features(ticker, raw_df=ohlcv_df, inference=True)
         if feat is None or feat.empty:
             raise ValueError(f"Could not build market features for {ticker}")
         return feat

@@ -60,7 +60,7 @@ def render() -> None:
                 '<div style="font-size:1.4rem;margin-bottom:6px">💬</div>'
                 '<div style="color:#10b981;font-weight:700;margin-bottom:6px">3. Generate</div>'
                 '<div style="color:#94a3b8;font-size:0.83rem">'
-                'Gemini 1.5 Flash (or OpenAI GPT-4o-mini if configured) generates '
+                'Claude 3.5 Haiku (or OpenAI GPT-4o-mini if configured) generates '
                 'the answer. Without an API key, the retrieved headlines are '
                 '<b style="color:#e2e8f0">shown directly</b>.</div></div>',
                 unsafe_allow_html=True,

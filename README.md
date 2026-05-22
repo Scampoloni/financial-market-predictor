@@ -165,7 +165,7 @@ Returns (1d/5d/20d), RSI-14, MACD (line/signal/histogram), SMA-20/SMA-50/EMA-12 
 ### NLP Block (28 features)
 FinBERT compound score + confidence, VADER compound score, news volume (1d/5d rolling), headline length, 10 FinBERT embedding PCA components, sentiment momentum, sentiment dispersion, 3-day sentiment shift, sentiment surprise (z-score vs 20-day baseline), sentiment × volume interaction, news volume z-score, imputation flag. Plus 5 analyst-data features: analyst consensus score, analyst coverage count, sentiment momentum from analyst revisions, upgrade/downgrade score, price target upside.
 
-**Coverage strategy:** ticker-level → sector-average fallback → market-average fallback → forward-fill. Raises raw 1.7% coverage to ~59%.
+**Coverage strategy:** ticker-level → sector-average fallback → market-average fallback → forward-fill. Raises raw 1.7% direct ticker-news coverage to near-complete row coverage, with most non-direct rows explicitly flagged as imputed.
 
 ### CV Block (10 features)
 10 PCA components from 1280-dim EfficientNet-B0 embeddings. Model fine-tuned on chart→direction labels (`scripts/finetune_cnn.py`) rather than using frozen ImageNet weights — this was the key step enabling a positive CV contribution.
@@ -215,7 +215,7 @@ The initial version reached F1 = 0.34 across three classes (UP/DOWN/SIDEWAYS) on
 | Phase | Change | Why |
 |-------|--------|-----|
 | 1 | 3-class next-day → 5-day binary | Doubles signal-to-noise; removes ill-defined SIDEWAYS band (60%+ of data) |
-| 2 | NLP fallback strategy | Raw 1.7% coverage makes NLP features a no-op; sector/market fallback gets to 59% |
+| 2 | NLP fallback strategy | Raw 1.7% direct coverage makes NLP features a no-op; sector/market fallback expands this to near-complete row coverage, with imputation tracked explicitly |
 | 3 | Chart generation: monthly → bi-daily | 1.7% CV coverage → 59%; 2,788 → 61,640 images |
 | 4 | LightGBM + Optuna + Stacking | Single default RF leaves F1 on the table; multi-model comparison removes selection bias |
 | 5 | `st.cache_resource` / `st.cache_data` | App reloaded models on every click; now <3s after initial load |
@@ -245,7 +245,8 @@ cd financial-market-predictor
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env             # add NEWS_API_KEY and optionally GEMINI_API_KEY
+cp .env.example .env             # Windows PowerShell: Copy-Item .env.example .env
+# then add NEWS_API_KEY and optionally CLAUDE_API_KEY
 ```
 
 ### Run the full pipeline
@@ -292,15 +293,15 @@ It covers **3 tickers (AAPL, MSFT, NVDA) + 2 indices**, ~3 months of market data
 corpus of news headlines — enough to exercise the entire feature-to-training pipeline in minutes
 rather than hours.
 
-**What the smoke run produces:**
-- `data/processed/features_market_smoke.parquet` — 28-feature market block for the 3 tickers
-- `data/processed/features_nlp_smoke.parquet` — 24-feature NLP block
-- `data/processed/features_cv_smoke.parquet` — 10 PCA CV embeddings
-- `models/lgbm_config_C_smoke.pkl` — a trained LightGBM Config C model (not production quality)
+**What the smoke run produces** (writes to the same default paths as the full pipeline — the smoke dataset swap ensures only 3-ticker data is processed):
+- `data/processed/features_market.parquet` — 28-feature market block for the 3 tickers
+- `data/processed/features_nlp.parquet` — NLP block (3 tickers)
+- `data/processed/features_cv.parquet` — 10 PCA CV embeddings (3 tickers)
+- `models/stacking_final.pkl` — a trained LightGBM Config C model (not production quality; restore full dataset to recover production artifacts)
 
 ```bash
-# Build smoke dataset from current raw data (one-time, already done in the repo)
-python scripts/build_smoke_dataset.py
+# Only needed if data/smoke is missing locally:
+# python scripts/build_smoke_dataset.py
 
 # Activate smoke dataset (backs up data/raw to data/raw_full)
 python scripts/use_smoke_data.py --activate
@@ -326,7 +327,7 @@ pytest tests/ -q
 | Layer | Libraries |
 |-------|-----------|
 | ML | scikit-learn, LightGBM, XGBoost, Optuna |
-| NLP | HuggingFace Transformers (FinBERT), NLTK (VADER), sentence-transformers (RAG) |
+| NLP | HuggingFace Transformers (FinBERT), NLTK (VADER), sentence-transformers (RAG), Anthropic Claude (RAG answer generation) |
 | CV | PyTorch, torchvision (EfficientNet-B0) |
 | Data | pandas, numpy, pyarrow, yfinance, feedparser |
 | Visualization | Plotly, matplotlib, mplfinance |

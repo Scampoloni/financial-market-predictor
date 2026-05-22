@@ -121,10 +121,10 @@ def test_ablation_results_have_per_class_metrics(ablation_results: dict) -> None
 def test_ablation_lgbm_present_in_all_configs(ablation_results: dict) -> None:
     """LightGBM must have been evaluated in all three configs."""
     for cfg, result in ablation_results.items():
-        models = result.get("models", {})
-        if models:
+        per_model = result.get("per_model", {})
+        if per_model:
             assert any("lightgbm" in k.lower() or "lgbm" in k.lower()
-                       for k in models.keys()), f"LightGBM missing from Config {cfg} models"
+                       for k in per_model.keys()), f"LightGBM missing from Config {cfg} per_model"
 
 
 # ---------------------------------------------------------------------------

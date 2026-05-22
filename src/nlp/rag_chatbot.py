@@ -7,7 +7,7 @@ Architecture:
   2. Retrieve: For a user query, cosine similarity retrieves the top-k most
                relevant headlines from the index.
   3. Generate: A structured answer is generated using the retrieved context.
-               If a Gemini or OpenAI API key is available, it uses the LLM.
+               If a Claude or OpenAI API key is available, it uses the LLM.
                Otherwise, a deterministic template-based fallback is used —
                ensuring the RAG pipeline always works without an API key.
 
@@ -148,7 +148,7 @@ def build_index(
 class FinancialRAG:
     """Retrieval-Augmented Generation over collected financial news headlines.
 
-    Supports optional ticker filtering, LLM answer generation (Gemini / OpenAI),
+    Supports optional ticker filtering, LLM answer generation (Claude / OpenAI),
     and a deterministic template-based fallback when no API key is configured.
 
     Args:
@@ -256,7 +256,7 @@ class FinancialRAG:
         """
         sources = self.retrieve(question, ticker=ticker, top_k=top_k)
 
-        # Try LLM answer generation (Gemini preferred, OpenAI fallback)
+        # Try LLM answer generation (Claude preferred, OpenAI fallback)
         answer = self._generate_llm_answer(question, sources, ticker)
         if answer is None:
             answer = self._template_answer(question, sources, ticker)
@@ -298,17 +298,25 @@ class FinancialRAG:
             "Answer based only on the above headlines:"
         )
 
-        # Try Google Gemini
-        gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if gemini_key:
+        # Try Anthropic Claude
+        claude_key = os.getenv("CLAUDE_API_KEY")
+        if claude_key:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=gemini_key)
-                model = genai.GenerativeModel("gemini-2.5-flash")
-                response = model.generate_content(f"{system_prompt}\n\n{user_prompt}")
-                return response.text.strip()
+                import anthropic
+
+                client = anthropic.Anthropic(api_key=claude_key)
+                response = client.messages.create(
+                    model="claude-3-5-haiku-latest",
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    max_tokens=300,
+                    temperature=0.3,
+                )
+                return "".join(
+                    block.text for block in response.content if getattr(block, "type", None) == "text"
+                ).strip()
             except Exception as exc:
-                logger.warning("Gemini API error: %s", exc)
+                logger.warning("Claude API error: %s", exc)
 
         # Try OpenAI fallback
         openai_key = os.getenv("OPENAI_API_KEY")
@@ -360,7 +368,7 @@ class FinancialRAG:
             answer += f"{i}. {hl}\n"
 
         answer += (
-            "\n💡 *Tip: Provide a Gemini or OpenAI API key in your .env to get "
+            "\n💡 *Tip: Provide a Claude or OpenAI API key in your .env to get "
             "natural language summaries instead of raw headlines.*"
         )
         return answer

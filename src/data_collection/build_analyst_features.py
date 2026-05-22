@@ -26,6 +26,8 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+from src.config import YFINANCE_CACHE_DIR  # ensures project-local yfinance cache setup
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(message)s",
@@ -80,6 +82,23 @@ def _consensus_from_aggregate(rec_df: pd.DataFrame) -> float | None:
         return None
 
 
+def _coverage_from_aggregate(rec_df: pd.DataFrame) -> int:
+    """Extract total analyst count from the aggregate recommendations table.
+
+    Returns 0 if data unavailable.
+    """
+    if rec_df is None:
+        return 0
+    try:
+        current = rec_df[rec_df["period"] == "0m"].iloc[0]
+        return int(sum(
+            int(current.get(k, 0) or 0)
+            for k in ("strongBuy", "buy", "hold", "sell", "strongSell")
+        ))
+    except Exception:
+        return 0
+
+
 # ---------------------------------------------------------------------------
 # Per-ticker feature builder
 # ---------------------------------------------------------------------------
@@ -109,7 +128,7 @@ def build_analyst_features_for_ticker(
 
     if has_history:
         ud = ud.copy()
-        ud.index = pd.to_datetime(ud.index, utc=True).tz_localize(None)
+        ud.index = pd.to_datetime(ud.index, utc=True).tz_convert(None)
         ud.index.name = "date"
         ud = ud.sort_index()
         ud["score"] = ud["ToGrade"].apply(_grade_to_score)
@@ -148,7 +167,7 @@ def build_analyst_features_for_ticker(
                 # Fallback to aggregate consensus if available
                 consensus = agg_consensus if agg_consensus is not None else np.nan
                 upgrade_score = 0.0
-                coverage = 0
+                coverage = _coverage_from_aggregate(rec_agg)
                 momentum = 0.0
             else:
                 # Recency-weighted consensus
@@ -182,7 +201,7 @@ def build_analyst_features_for_ticker(
             # No historical data — use only aggregate consensus
             consensus = agg_consensus if agg_consensus is not None else np.nan
             upgrade_score = 0.0
-            coverage = 0
+            coverage = _coverage_from_aggregate(rec_agg)
             momentum = 0.0
 
         results.append({

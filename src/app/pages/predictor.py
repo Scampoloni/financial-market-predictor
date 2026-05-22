@@ -119,13 +119,16 @@ def _load_sentiment_timeline(ticker: str) -> pd.DataFrame | None:
     try:
         nlp = pd.read_parquet(FEATURES_NLP_PATH)
         nlp.index = pd.to_datetime(nlp.index)
-        t_nlp = nlp[nlp["ticker"] == ticker][["finbert_sentiment", "is_sentiment_imputed"]].tail(60)
+        t_nlp = nlp[nlp["ticker"] == ticker][["finbert_sentiment", "is_sentiment_imputed"]]
 
         market = pd.read_parquet(FEATURES_MARKET_PATH)
         market.index = pd.to_datetime(market.index)
-        t_mkt = market[market["ticker"] == ticker][["close"]].tail(60)
+        t_mkt = market[market["ticker"] == ticker][["close"]]
 
-        merged = t_mkt.join(t_nlp, how="inner")
+        # Left join on market dates so we always get market rows, fill NLP gaps
+        merged = t_mkt.join(t_nlp, how="left").tail(60)
+        merged["finbert_sentiment"] = merged["finbert_sentiment"].fillna(0.0)
+        merged["is_sentiment_imputed"] = merged["is_sentiment_imputed"].fillna(1.0)
         if len(merged) < 3:
             return None
         return merged
@@ -325,8 +328,11 @@ def _sentiment_timeline(ticker: str, nlp_pct: float | None = None) -> None:
             note = (f'NLP sentiment features contribute <b style="color:#f59e0b">{nlp_pct:.1f}%</b>'
                     f' of total model feature importance.')
         else:
-            note = (f'NLP contribution is minimal (<b style="color:#f59e0b">{nlp_pct:.1f}%</b> importance) '
-                    f'— most days rely on sector-level sentiment fallback due to sparse news coverage.')
+            note = (
+                f'Sentiment chart shows pre-computed FinBERT scores (last 30 days). '
+                f'In this run NLP features account for <b style="color:#f59e0b">{nlp_pct:.1f}%</b> '
+                f'of model importance — consistent with EMH: public news is largely priced in at a 5-day horizon.'
+            )
         st.markdown(
             f'<p style="color:{_MUTED};font-size:0.82rem;margin-top:-0.5rem">{note}</p>',
             unsafe_allow_html=True,

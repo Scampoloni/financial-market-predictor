@@ -18,6 +18,7 @@ DATA_DIR = ROOT_DIR / "data"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 METADATA_DIR = DATA_DIR / "metadata"
+YFINANCE_CACHE_DIR = DATA_DIR / "cache" / "yfinance"
 
 RAW_MARKET_DIR = RAW_DIR / "market_data"
 RAW_NEWS_DIR = RAW_DIR / "news"
@@ -25,6 +26,30 @@ RAW_CHARTS_DIR = RAW_DIR / "charts"
 
 MODELS_DIR = ROOT_DIR / "models"
 NOTEBOOKS_DIR = ROOT_DIR / "notebooks"
+
+# Keep yfinance caches inside the project so analyst/news endpoints do not fail
+# on machines where the default user cache directory is not writable.
+YFINANCE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    import yfinance as yf
+    import yfinance.cache as yf_cache
+
+    yf.set_tz_cache_location(str(YFINANCE_CACHE_DIR))
+
+    # Some environments expose sqlite write/open issues inside yfinance's
+    # internal caches. Disabling those caches keeps live requests functional
+    # and avoids false "no coverage" fallbacks for analyst/news endpoints.
+    for cache_getter in (
+        yf_cache.get_tz_cache,
+        yf_cache.get_cookie_cache,
+        yf_cache.get_isin_cache,
+    ):
+        cache = cache_getter()
+        cache.dummy = True
+        cache.initialised = 0
+        cache.db = None
+except Exception:
+    pass
 
 # Processed feature files
 FEATURES_MARKET_PATH = PROCESSED_DIR / "features_market.parquet"
@@ -49,7 +74,7 @@ CHART_CNN_PATH = MODELS_DIR / "chart_cnn.pth"
 # API Keys (loaded from .env)
 # ---------------------------------------------------------------------------
 NEWS_API_KEY: str = os.getenv("NEWS_API_KEY", "")
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+CLAUDE_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Data collection constants
@@ -289,7 +314,7 @@ FINBERT_MODEL_NAME = "ProsusAI/finbert"
 FINBERT_BATCH_SIZE = 32
 FINBERT_MAX_LENGTH = 512
 
-GEMINI_MODEL_NAME = "gemini-pro"
+CLAUDE_MODEL_NAME = "claude-3-5-haiku-latest"
 
 # RSS feed URLs
 RSS_FEEDS = {

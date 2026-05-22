@@ -23,7 +23,7 @@ def render() -> None:
         "<b style='color:#f0f6fc'>Scientific question:</b> Can publicly available market data, "
         "financial news sentiment, and candlestick chart patterns predict short-term stock price "
         "direction better than a random baseline?<br><br>"
-        "We approach this as a binary classification problem — predicting whether a stock's "
+        "I approach this as a binary classification problem — predicting whether a stock's "
         "closing price will be <b style='color:#10b981'>UP</b> or "
         "<b style='color:#ef4444'>DOWN</b> over 5- and 21-trading-day horizons — using a "
         "temporal train/validation/test split to prevent data leakage."
@@ -204,7 +204,7 @@ def render() -> None:
         ("📊", "#10b981", "ML / Numeric",    "scikit-learn · LightGBM · XGBoost · Optuna"),
         ("📰", "#8b5cf6", "NLP",             "HuggingFace Transformers (FinBERT) · NLTK (VADER) · sentence-transformers"),
         ("📈", "#60a5fa", "Computer Vision", "PyTorch · torchvision (EfficientNet-B0) · mplfinance"),
-        ("💬", "#f59e0b", "RAG Chatbot",     "sentence-transformers · cosine similarity · Gemini 1.5 Flash / OpenAI fallback"),
+        ("💬", "#f59e0b", "RAG Chatbot",     "sentence-transformers · cosine similarity · Claude 3.5 Haiku / OpenAI fallback"),
         ("📦", "#94a3b8", "Data",            "pandas · numpy · yfinance · feedparser · Plotly"),
         ("🌐", "#94a3b8", "App",             "Streamlit · Plotly"),
     ]

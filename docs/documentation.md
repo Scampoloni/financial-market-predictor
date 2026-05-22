@@ -1,21 +1,3 @@
-# AI Applications Project Documentation Template
-
-### Example: Reference to a notebook section
-Reference to the header `## Data Preprocessing` in the notebook `analysis.ipynb`:
-
-> See *Data Preprocessing* in
-> [`analysis.ipynb`](analysis.ipynb#data-preprocessing)
-
-### Example: Reference to Python code
-
-Reference to a single line in `model.py`, line 42:
-> [`model.py`, line 42](model.py#L42)
-
-Reference to multiple lines in `train.py`, lines 15-38:
-> [`train.py`, lines 15-38](train.py#L15-L38)
-
----
-
 ## Project Metadata
 
 - **Project title:** Financial Market Predictor
@@ -183,7 +165,7 @@ Total corpus: ~8,550 headline-rows stored in `data/raw/news/`.
 #### 2B.2 Preprocessing and Prompt Design
 
 - **Text preprocessing:** Lower-case normalisation; removal of boilerplate ticker mentions; deduplication by headline hash; 512-token truncation for FinBERT. See [`src/nlp/finbert_sentiment.py`](src/nlp/finbert_sentiment.py).
-- **Prompt design or retrieval setup:** No generative prompting for the sentiment pipeline. For the RAG chatbot ([`src/nlp/rag_chatbot.py`](src/nlp/rag_chatbot.py)): headlines are chunked and embedded with `sentence-transformers/all-MiniLM-L6-v2`; top-5 retrieved chunks are prepended to a Gemini API call. Coverage fallback hierarchy: ticker-level → sector-average → market-average → forward-fill.
+- **Prompt design or retrieval setup:** No generative prompting for the sentiment pipeline. For the RAG chatbot ([`src/nlp/rag_chatbot.py`](src/nlp/rag_chatbot.py)): headlines are chunked and embedded with `sentence-transformers/all-MiniLM-L6-v2`; top-5 retrieved chunks are prepended to a Claude API call. Coverage fallback hierarchy: ticker-level → sector-average → market-average → forward-fill.
 
   **NLP sentiment coverage by fallback tier** (out of 97,351 total ticker-day rows):
 
@@ -329,7 +311,8 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
   # or: .venv\Scripts\activate                         # Windows
   pip install -r requirements.txt
   cp .env.example .env
-  # Edit .env: add NEWS_API_KEY and (optional) GEMINI_API_KEY
+  # Windows PowerShell: Copy-Item .env.example .env
+  # Edit .env: add NEWS_API_KEY and (optional) CLAUDE_API_KEY
   ```
 
 - **Data setup (full pipeline, several hours):**
@@ -355,7 +338,8 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
 
 - **Smoke test (5–10 minutes, no API keys required):**
   ```bash
-  python scripts/build_smoke_dataset.py
+  # Only needed if data/smoke is missing locally:
+  # python scripts/build_smoke_dataset.py
   python -m src.features.market_features --test
   python -m src.features.nlp_features --test
   python -m src.data_collection.chart_generator --test --step 2

@@ -303,6 +303,7 @@ def build_ticker_features(
     data_dir: Path = RAW_MARKET_DIR,
     vix_df: pd.DataFrame | None = None,
     raw_df: pd.DataFrame | None = None,
+    inference: bool = False,
 ) -> pd.DataFrame | None:
     """Build the full feature matrix for a single ticker.
 
@@ -316,6 +317,9 @@ def build_ticker_features(
         vix_df: Pre-loaded VIX DataFrame to avoid repeated disk reads.
         raw_df: Optional pre-loaded OHLCV DataFrame (used by LivePredictor).
                 If provided, skips CSV loading.
+        inference: When True, skip target computation and do not drop the last
+                   5 rows (which have NaN forward returns). Use for live
+                   prediction so the most-recent market data is retained.
 
     Returns:
         Feature DataFrame with DatetimeIndex, or None on failure.
@@ -376,11 +380,13 @@ def build_ticker_features(
         else:
             features["vix_level"] = np.nan
 
-        # Target label (uses future prices — rows at tail will be NaN)
-        features["target"] = compute_target(close)
-
-        # Drop rows with NaN target (end of series) or insufficient history (start)
-        features = features.dropna(subset=["target", "return_20d", "sma_50_ratio"])
+        if inference:
+            # Live prediction: no target needed; keep the latest rows
+            features = features.dropna(subset=["return_20d", "sma_50_ratio"])
+        else:
+            # Training: target uses future prices — last 5 rows will be NaN
+            features["target"] = compute_target(close)
+            features = features.dropna(subset=["target", "return_20d", "sma_50_ratio"])
 
         return features
 
