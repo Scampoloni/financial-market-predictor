@@ -137,6 +137,7 @@ def build_analyst_features_for_ticker(
             has_history = False
 
     # ── 2. Current aggregate consensus ──────────────────────────────────────
+    rec_agg = None  # ensure always defined even if the fetch below raises
     try:
         rec_agg = t.recommendations
         agg_consensus = _consensus_from_aggregate(rec_agg) if rec_agg is not None else None

@@ -761,7 +761,7 @@ def render() -> None:
     clicked_ticker = _render_watchlist()
 
     # ── Ticker selector row ──────────────────────────────────────────────────
-    col_sel, col_horizon, col_btn, col_sync, _ = st.columns([2, 1.5, 1, 1, 1.5])
+    col_sel, col_horizon, col_btn, _ = st.columns([2, 1.5, 1, 2.5])
 
     with col_sel:
         default_idx = TICKERS_SORTED.index(clicked_ticker) if clicked_ticker and clicked_ticker in TICKERS_SORTED \
@@ -784,21 +784,6 @@ def render() -> None:
 
     with col_btn:
         run = st.button("Predict", type="primary", use_container_width=True)
-        
-    with col_sync:
-        sync_btn = st.button("Sync News", use_container_width=True)
-        
-    if sync_btn:
-        with st.spinner(f"Fetching live news & sentiment for {ticker}..."):
-            try:
-                from src.data_collection.news_scraper import collect_all
-                from src.features.nlp_features import update_single_ticker_nlp
-                collect_all([ticker])
-                update_single_ticker_nlp(ticker)
-                st.cache_data.clear()
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to sync news: {e}")
 
     # ── Ticker info header ───────────────────────────────────────────────────
     sector = TICKER_SECTOR_MAP.get(ticker, "")
@@ -865,25 +850,37 @@ def render() -> None:
         progress_bar = st.progress(0)
         progress_text = st.empty()
 
+        progress_text.markdown("🔄 **Fetching latest news headlines...**")
+        progress_bar.progress(8)
+        try:
+            from src.data_collection.news_scraper import collect_all
+            from src.features.nlp_features import update_single_ticker_nlp
+            collect_all([ticker])
+            update_single_ticker_nlp(ticker)
+            _load_sentiment_timeline.clear()
+            _load_ticker_news_dates.clear()
+        except Exception:
+            pass  # continue with cached news if live fetch fails
+
         progress_text.markdown("📊 **Fetching market data & computing indicators...**")
-        progress_bar.progress(15)
+        progress_bar.progress(20)
         market_feat = predictor.build_market_features(ticker, ohlcv_df=ohlcv)
 
         progress_text.markdown("📰 **Running sentiment analysis (FinBERT + VADER)...**")
-        progress_bar.progress(35)
+        progress_bar.progress(38)
         nlp_feat = predictor.build_nlp_features(ticker)
 
         progress_text.markdown("🏦 **Fetching analyst ratings & price targets...**")
-        progress_bar.progress(55)
+        progress_bar.progress(58)
         current_price = float(ohlcv["Close"].iloc[-1]) if not ohlcv.empty else None
         analyst_feat = predictor.build_analyst_features(ticker, current_price=current_price)
 
         progress_text.markdown("📈 **Processing chart patterns (EfficientNet-B0)...**")
-        progress_bar.progress(70)
+        progress_bar.progress(74)
         cv_feat = predictor.build_cv_features(ticker, ohlcv_df=ohlcv)
 
         progress_text.markdown(f"🤖 **Running {selected_horizon}-day prediction model...**")
-        progress_bar.progress(88)
+        progress_bar.progress(90)
         results[selected_horizon] = predictor.predict_from_features(
             ticker, market_feat, nlp_feat, cv_feat, horizon=selected_horizon,
             analyst_feat=analyst_feat,
