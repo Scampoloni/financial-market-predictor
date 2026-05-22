@@ -215,3 +215,46 @@ def test_ablation_config_d_cv_f1_plausible(ablation_results: dict) -> None:
     assert 0.40 <= cv_f1 <= 0.60, (
         f"Config D CV F1 = {cv_f1:.4f} is outside the expected range [0.40, 0.60]"
     )
+
+
+# ---------------------------------------------------------------------------
+# 21-day horizon model
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def model_21d_bundle():
+    """Load the 21-day model bundle."""
+    if not config.MODEL_21D_PATH.exists():
+        pytest.skip("model_21d.pkl not present (run scripts/train_21d.py first)")
+    with open(config.MODEL_21D_PATH, "rb") as f:
+        return pickle.load(f)
+
+
+def test_model_21d_has_required_keys(model_21d_bundle) -> None:
+    """21-day model bundle must contain model, feature_cols, and horizon keys."""
+    for key in ("model", "feature_cols", "horizon"):
+        assert key in model_21d_bundle, f"model_21d.pkl missing key '{key}'"
+
+
+def test_model_21d_correct_horizon(model_21d_bundle) -> None:
+    """21-day model bundle must declare horizon=21."""
+    assert model_21d_bundle["horizon"] == 21, (
+        f"Expected horizon=21, got {model_21d_bundle['horizon']}"
+    )
+
+
+def test_model_21d_has_analyst_features(model_21d_bundle) -> None:
+    """21-day model must include corrected analyst feature columns."""
+    feat_cols = model_21d_bundle["feature_cols"]
+    expected = {"analyst_consensus", "analyst_upgrade_score", "analyst_coverage_count",
+                "price_target_upside", "analyst_sentiment_momentum"}
+    present = {f for f in feat_cols if f.startswith("analyst_") or f == "price_target_upside"}
+    missing = expected - present
+    assert not missing, f"model_21d.pkl missing analyst features: {missing}"
+
+
+def test_model_21d_feature_count_matches_5d(model_21d_bundle) -> None:
+    """21-day model must use the same 66-feature Config D set as the 5-day model."""
+    n_21d = len(model_21d_bundle["feature_cols"])
+    assert n_21d == 66, f"Expected 66 features for 21d model, got {n_21d}"
