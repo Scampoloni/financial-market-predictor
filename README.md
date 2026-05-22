@@ -37,8 +37,11 @@ All models evaluated on held-out **2025 test data** (temporal split, no leakage)
 | **A** | Market only | 28 | LightGBM | 0.509 ± 0.016 | **0.4970** | **0.4971** | — |
 | **B** | Market + NLP | 56 | LightGBM | 0.510 ± 0.027 | 0.4826 | 0.4842 | -0.0143 |
 | **C** | Market + NLP + CV | 66 | LightGBM | 0.511 ± 0.018 | 0.4861 | 0.4863 | -0.0109 |
+| **D** | Market + NLP + CV + Analyst ✓ | 66 | LightGBM | 0.511 ± 0.020 | 0.4850 | 0.4850 | -0.0120 |
 
-**Interpretation:** ~0.50 F1 remains a realistic ceiling for direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. In this latest run, Config A is strongest on test; NLP and CV remain valuable as integrated modalities and interaction channels, but do not improve headline test F1 in this split.
+> **Config D** re-runs Config C with corrected analyst data (a `NameError` in `build_analyst_features.py` silently produced all-zero analyst features in earlier runs). The negligible delta (D vs C = −0.0011) confirms that analyst consensus ratings are largely priced in at the 5-day horizon.
+
+**Interpretation:** ~0.50 F1 remains a realistic ceiling for direction prediction on public data — consistent with the semi-strong Efficient Market Hypothesis. Config A (market only) achieves the highest test F1; the multi-modal blocks add coverage and complementary signal but do not lift the headline metric, which is consistent with semi-strong market efficiency.
 
 **Selection protocol:** Best model per config is chosen by **validation F1 only** (2024H2). The **test set (2025)** is evaluated once for final reporting.
 
@@ -47,6 +50,7 @@ All models evaluated on held-out **2025 test data** (temporal split, no leakage)
 | Market (ML) | Baseline | Technical indicators capture momentum, volatility, mean-reversion regimes |
 | NLP | -0.0143 F1 vs A | Sentiment *changes* can lead price, but coverage remains sparse even with fallback |
 | CV | -0.0109 F1 vs A (+0.0035 vs B) | Fine-tuned EfficientNet-B0 captures visual patterns complementary to indicators; in this run the net effect remains below baseline A |
+| Analyst ✓ | -0.0011 F1 vs C (Config D) | Analyst consensus, coverage and price targets are publicly visible and rapidly priced in — consistent with semi-strong EMH |
 
 ### Multi-Horizon Comparison
 
@@ -316,7 +320,7 @@ python -m src.models.train_ml --config C
 # Restore full dataset
 python scripts/use_smoke_data.py --restore
 
-# Run test suite (68 tests — no downloads required)
+# Run test suite (72 tests — no downloads required)
 pytest tests/ -q
 ```
 
