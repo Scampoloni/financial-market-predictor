@@ -54,15 +54,14 @@ All models evaluated on held-out **2025 test data** (temporal split, no leakage)
 
 ### Multi-Horizon Comparison
 
-The app also supports a **21-day prediction horizon** (Config C equivalent, 61 features), evaluated on the same held-out 2025 test set:
+The app also supports a **21-day prediction horizon** (same 66-feature Config D set), evaluated on the same held-out 2025 test set:
 
-| Horizon | Features | Test F1 | Test Acc | Test Rows |
-|---------|----------|:-------:|:--------:|:---------:|
-| **5-day** | 66 (Config C) | **0.4861** | 0.4863 | 20,033 |
-| **21-day** | 61 (Config C) | 0.4961 | 0.4989 | 18,961 |
+| Horizon | Features | Best Model | CV F1 | Test F1 | Test Acc | Test Rows |
+|---------|----------|-----------|:-----:|:-------:|:--------:|:---------:|
+| **5-day** | 66 (Config D) | LightGBM | 0.511 ± 0.020 | 0.4850 | 0.4850 | 20,033 |
+| **21-day** | 66 (Config D) | LightGBM | 0.522 ± 0.056 | 0.4723 | 0.4749 | 18,961 |
 
-**Finding:** The EMH ceiling (~0.50 F1) holds consistently across both prediction horizons, confirming that the signal limitation is structural rather than specific to the 5-day window. The 21-day model offers slightly higher recall on DOWN predictions (0.65 vs 0.59), suggesting chart patterns carry more signal over longer windows.
-**Note:** 5-day numbers reflect the validation-based selection protocol update; re-train the 21-day model to align metrics if required.
+**Finding:** The EMH ceiling (~0.50 F1) is consistent across both horizons. Both models use the same feature set, same Optuna-tuned LightGBM pipeline, and identical val-based selection protocol — results are directly comparable. The 21-day model has higher CV F1 (0.522 vs 0.511) but lower test F1 (0.4723 vs 0.4850), reflecting the higher uncertainty of the longer horizon on the 2025 test period.
 
 ### Model Selection Protocol
 
@@ -274,13 +273,16 @@ python -m src.data_collection.chart_generator --step 2
 # 6. Build CV features (EfficientNet + PCA)
 python -m src.features.cv_features
 
-# 7. Train models + run ablation study
+# 7. Train models + run ablation study (Config A/B/C/D, 5-day horizon)
 python -m src.models.train_ml
 
-# 8. (Optional) Fine-tune EfficientNet-B0 on chart labels
+# 8. Train 21-day horizon model (LightGBM + Optuna, 66 features)
+python scripts/train_21d.py
+
+# 9. (Optional) Fine-tune EfficientNet-B0 on chart labels
 python scripts/finetune_cnn.py --epochs 10
 
-# 9. Launch the app
+# 10. Launch the app
 streamlit run app.py
 ```
 
@@ -320,7 +322,7 @@ python -m src.models.train_ml --config C
 # Restore full dataset
 python scripts/use_smoke_data.py --restore
 
-# Run test suite (72 tests — no downloads required)
+# Run test suite (76 tests — no downloads required)
 pytest tests/ -q
 ```
 
