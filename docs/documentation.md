@@ -348,7 +348,7 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
   python -m src.data_collection.chart_generator --test --step 2
   python -m src.features.cv_features --test
   python -m src.models.train_ml --config C
-  pytest tests/ -q   # 72 tests (no downloads required)
+  pytest tests/ -q   # 76 tests (no downloads required)
   ```
 
 - **Reproducibility notes:** Python 3.11+. All random seeds fixed via `src/config.py`. Pre-computed artifacts are committed to the repository (`models/`, `data/processed/`) so the app can be launched without re-running the full pipeline.
@@ -361,6 +361,6 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
 - [x] More than two data sources used with clear added value — Yahoo Finance OHLCV, RSS feeds, NewsAPI, FinBERT (HuggingFace), EfficientNet-B0 (torchvision) with fine-tuning on domain data.
 - [x] Extended evaluation — Bootstrap 95 % CI (N = 2,000), 5-fold TimeSeriesSplit, per-class precision/recall/F1, multi-horizon comparison (5-day vs 21-day), per-class shift analysis (DOWN/UP recall trade-off across configs), statistical significance of ablation deltas. See [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
 - [x] Ethics, bias, or fairness analysis — Documented in `README.md`: survivorship bias (currently-listed S&P 500 only), English-language news concentration, market access inequality, EMH interpretation of ~0.50 F1. System carries an explicit "not financial advice" disclaimer in the app.
-- [x] Comprehensive test suite — 72 pytest tests covering feature parquet contracts (column names, value ranges, binary flags), ablation result validity (including Config D), VADER and FinBERT pipeline output format, CV PCA dimension and variance checks, temporal split non-overlap, and model artifact integrity. All tests run without network access or GPU. See [`tests/`](tests/).
+- [x] Comprehensive test suite — 76 pytest tests covering feature parquet contracts (column names, value ranges, binary flags), ablation result validity (including Config D), 21-day model bundle contracts, VADER and FinBERT pipeline output format, CV PCA dimension and variance checks, temporal split non-overlap, and model artifact integrity. All tests run without network access or GPU. See [`tests/`](tests/).
 
 Evidence for selected bonus items: full ablation results in [`data/processed/ablation_results.json`](data/processed/ablation_results.json); evaluation visualisations in [`data/processed/ablation_f1_bar.png`](data/processed/ablation_f1_bar.png), [`data/processed/per_class_performance.png`](data/processed/per_class_performance.png), [`data/processed/feature_importance.png`](data/processed/feature_importance.png), [`data/processed/bootstrap_ci.png`](data/processed/bootstrap_ci.png).
