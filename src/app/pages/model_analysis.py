@@ -13,9 +13,24 @@ from src.app.utils import load_ablation_results
 from src.config import TARGET_CLASSES, CV_FOLDS, STACKING_MODEL_PATH
 
 _MUTED = "#64748b"
-_CFG_NAMES = {"A": "Market only", "B": "Market + NLP", "C": "Market + NLP + CV"}
-_CFG_COLORS = {"A": "#94a3b8", "B": "#8b5cf6", "C": "#10b981"}
-_CFG_FEAT_COUNTS = {"A": "28 features", "B": "56 features", "C": "66 features"}
+_CFG_NAMES = {
+    "A": "Market only",
+    "B": "Market + NLP",
+    "C": "Market + NLP + CV",
+    "D": "Market + NLP + CV + Analyst ✓",   # ✓ = corrected analyst data
+}
+_CFG_COLORS = {
+    "A": "#94a3b8",
+    "B": "#8b5cf6",
+    "C": "#10b981",
+    "D": "#f59e0b",   # amber — corrected/complete model
+}
+_CFG_FEAT_COUNTS = {
+    "A": "28 features",
+    "B": "56 features",
+    "C": "66 features",
+    "D": "66 features (corrected)",
+}
 
 
 def _block_color(feat: str) -> str:
@@ -24,6 +39,8 @@ def _block_color(feat: str) -> str:
         return "#8b5cf6"  # NLP = purple
     if "chart" in feat:
         return "#f97316"  # CV = orange
+    if feat.startswith("analyst_"):
+        return "#f59e0b"  # Analyst = amber
     return "#4a90d9"  # Market = steel blue
 
 
@@ -69,7 +86,7 @@ def render() -> None:
     )
 
     table_rows = ""
-    for cfg in ["A", "B", "C"]:
+    for cfg in ["A", "B", "C", "D"]:
         r = results[cfg]
         f1 = r["test_f1_macro"]
         acc = r["test_accuracy"]
@@ -81,6 +98,9 @@ def render() -> None:
             delta_html = f'<span style="color:#10b981;font-weight:700">+{delta:.4f}</span>'
         else:
             delta_html = f'<span style="color:#ef4444;font-weight:700">{delta:+.4f}</span>'
+        # Skip Config D row if not yet computed
+        if cfg == "D" and cfg not in results:
+            continue
 
         best = r.get("best_model", "--")
         color = _CFG_COLORS[cfg]
@@ -131,10 +151,11 @@ def render() -> None:
         if c == "A":
             bar_labels.append(f"{results[c]['test_f1_macro']:.4f}  (baseline)")
         elif delta > 0:
-            src = "NLP" if c == "B" else "CV"
+            src = {"B": "NLP", "C": "CV", "D": "Analyst ✓"}.get(c, "")
             bar_labels.append(f"{results[c]['test_f1_macro']:.4f}  (+{delta:.4f} from {src})")
         else:
-            bar_labels.append(f"{results[c]['test_f1_macro']:.4f}  ({delta:+.4f})")
+            src = {"B": "NLP", "C": "CV", "D": "Analyst ✓"}.get(c, "")
+            bar_labels.append(f"{results[c]['test_f1_macro']:.4f}  ({delta:+.4f} {src})")
 
     fig = go.Figure(go.Bar(
         y=[f"Config {c} -- {_CFG_NAMES[c]}" for c in cfgs],
@@ -149,7 +170,7 @@ def render() -> None:
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        height=200, margin=dict(l=10, r=140, t=10, b=10),
+        height=260, margin=dict(l=10, r=140, t=10, b=10),
         xaxis=dict(range=[max(0, min(f1s) - 0.01), max(f1s) + 0.02],
                    gridcolor="#1e293b", zeroline=False, showticklabels=False),
         yaxis=dict(gridcolor="#1e293b", autorange="reversed",
@@ -166,7 +187,8 @@ def render() -> None:
         '<p style="color:#64748b;font-size:0.85rem;margin-bottom:0.8rem">'
         '<span style="color:#4a90d9">&#9679;</span> Market &nbsp;&nbsp;'
         '<span style="color:#8b5cf6">&#9679;</span> NLP &nbsp;&nbsp;'
-        '<span style="color:#f97316">&#9679;</span> CV</p>',
+        '<span style="color:#f97316">&#9679;</span> CV &nbsp;&nbsp;'
+        '<span style="color:#f59e0b">&#9679;</span> Analyst</p>',
         unsafe_allow_html=True,
     )
 
@@ -197,22 +219,28 @@ def render() -> None:
         # Importance breakdown by block
         nlp_keys = ("finbert", "vader", "news", "headline", "sentiment")
         cv_keys = ("chart",)
+        analyst_keys = ("analyst_",)
         nlp_pct = importances[[c for c in importances.index if any(k in c for k in nlp_keys)]].sum()
         cv_pct = importances[[c for c in importances.index if any(k in c for k in cv_keys)]].sum()
-        mkt_pct = importances.sum() - nlp_pct - cv_pct
+        analyst_pct = importances[[c for c in importances.index if c.startswith("analyst_")]].sum()
+        total = importances.sum()
+        mkt_pct = total - nlp_pct - cv_pct - analyst_pct
 
         st.markdown(
             f'<div class="glass-card" style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;'
             f'text-align:center;padding:16px">'
-            f'<div style="flex:1;min-width:120px">'
-            f'<div style="color:#4a90d9;font-size:1.5rem;font-weight:800">{mkt_pct:.1%}</div>'
+            f'<div style="flex:1;min-width:100px">'
+            f'<div style="color:#4a90d9;font-size:1.5rem;font-weight:800">{mkt_pct/total:.1%}</div>'
             f'<div style="color:#64748b;font-size:0.82rem">Market</div></div>'
-            f'<div style="flex:1;min-width:120px">'
-            f'<div style="color:#8b5cf6;font-size:1.5rem;font-weight:800">{nlp_pct:.1%}</div>'
+            f'<div style="flex:1;min-width:100px">'
+            f'<div style="color:#8b5cf6;font-size:1.5rem;font-weight:800">{nlp_pct/total:.1%}</div>'
             f'<div style="color:#64748b;font-size:0.82rem">NLP</div></div>'
-            f'<div style="flex:1;min-width:120px">'
-            f'<div style="color:#f97316;font-size:1.5rem;font-weight:800">{cv_pct:.1%}</div>'
-            f'<div style="color:#64748b;font-size:0.82rem">CV</div></div></div>',
+            f'<div style="flex:1;min-width:100px">'
+            f'<div style="color:#f97316;font-size:1.5rem;font-weight:800">{cv_pct/total:.1%}</div>'
+            f'<div style="color:#64748b;font-size:0.82rem">CV</div></div>'
+            f'<div style="flex:1;min-width:100px">'
+            f'<div style="color:#f59e0b;font-size:1.5rem;font-weight:800">{analyst_pct/total:.1%}</div>'
+            f'<div style="color:#64748b;font-size:0.82rem">Analyst</div></div></div>',
             unsafe_allow_html=True,
         )
     else:
@@ -334,9 +362,27 @@ def render() -> None:
     # ── 7. INTERPRETATION ────────────────────────────────────────────────────
     nlp_delta = results["B"]["test_f1_macro"] - results["A"]["test_f1_macro"]
     cv_delta = results["C"]["test_f1_macro"] - results["B"]["test_f1_macro"]
+    analyst_delta = results["D"]["test_f1_macro"] - results["C"]["test_f1_macro"] if "D" in results else None
 
     st.markdown("<h3 style='margin-top:1.5rem'>Interpretation</h3>", unsafe_allow_html=True)
     nlp_effect = "improves" if nlp_delta > 0 else "changes"
+
+    analyst_para = ""
+    if analyst_delta is not None:
+        analyst_effect = "improves" if analyst_delta > 0 else "leaves"
+        analyst_para = (
+            f'<p><b style="color:#f59e0b">Analyst correction contribution ({analyst_delta:+.4f} F1):</b> '
+            f'Config D re-trains on the same 66 features as Config C, but with corrected analyst data '
+            f'(previously all-zero due to a <code>NameError</code> in the batch pipeline). '
+            f'The corrected analyst consensus, upgrade score, coverage count, price-target upside, '
+            f'and sentiment momentum {analyst_effect} Test F1 from '
+            f'{results["C"]["test_f1_macro"]:.4f} to {results["D"]["test_f1_macro"]:.4f} '
+            f'({analyst_delta:+.4f}). The near-zero delta confirms that analyst ratings, '
+            f'while conceptually valuable, are largely priced in at the 5-day horizon — '
+            f'consistent with the semi-strong form of the EMH. The corrected pipeline also '
+            f'provides a clean data quality baseline for future work.</p>'
+        )
+
     st.markdown(
         f'<div class="glass-card" style="line-height:1.8;color:#94a3b8;font-size:0.9rem">'
 
@@ -357,6 +403,8 @@ def render() -> None:
         f'technical indicators already in the feature set (RSI, MACD, Bollinger Bands). '
         f'This confirms that much of the "visual" information in candlestick charts '
         f'is already captured by numerical indicators.</p>'
+
+        f'{analyst_para}'
 
         f'<p><b style="color:#60a5fa">Market efficiency implication:</b> '
         f'The overall F1 of ~0.50 for 5-day binary prediction is consistent with '

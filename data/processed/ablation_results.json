@@ -385,5 +385,150 @@
         "test_accuracy": 0.5322717516098437
       }
     }
+  },
+  "D": {
+    "n_features": 66,
+    "feature_cols": [
+      "return_1d",
+      "return_5d",
+      "return_20d",
+      "rsi_14",
+      "macd",
+      "macd_signal",
+      "macd_hist",
+      "sma_20_ratio",
+      "sma_50_ratio",
+      "ema_12_ratio",
+      "volatility_20d",
+      "atr_14",
+      "bb_upper_dist",
+      "bb_lower_dist",
+      "bb_width",
+      "volume_ratio",
+      "dow_sin",
+      "dow_cos",
+      "month_sin",
+      "month_cos",
+      "vix_level",
+      "finbert_sentiment",
+      "finbert_confidence",
+      "vader_sentiment",
+      "news_volume_1d",
+      "headline_avg_length",
+      "sentiment_dispersion",
+      "news_volume_5d",
+      "sentiment_momentum",
+      "is_sentiment_imputed",
+      "sentiment_shift_3d",
+      "sentiment_surprise",
+      "news_volume_zscore",
+      "sentiment_x_volume",
+      "finbert_embed_pca_1",
+      "finbert_embed_pca_2",
+      "finbert_embed_pca_3",
+      "finbert_embed_pca_4",
+      "finbert_embed_pca_5",
+      "finbert_embed_pca_6",
+      "finbert_embed_pca_7",
+      "finbert_embed_pca_8",
+      "finbert_embed_pca_9",
+      "finbert_embed_pca_10",
+      "analyst_consensus",
+      "analyst_upgrade_score",
+      "analyst_coverage_count",
+      "price_target_upside",
+      "analyst_sentiment_momentum",
+      "chart_embed_pca_1",
+      "chart_embed_pca_2",
+      "chart_embed_pca_3",
+      "chart_embed_pca_4",
+      "chart_embed_pca_5",
+      "chart_embed_pca_6",
+      "chart_embed_pca_7",
+      "chart_embed_pca_8",
+      "chart_embed_pca_9",
+      "chart_embed_pca_10",
+      "sector_Consumer",
+      "sector_Energy",
+      "sector_Finance",
+      "sector_Healthcare",
+      "sector_Industrial",
+      "sector_Insurance",
+      "sector_Technology"
+    ],
+    "best_model": "LightGBM",
+    "selection_metric": "val_f1_macro",
+    "cv_f1_mean": 0.5109107273628897,
+    "cv_f1_std": 0.02046127527002757,
+    "cv_acc_mean": 0.5217297655538067,
+    "fold_f1": [
+      0.4876841708358637,
+      0.5210607762813046,
+      0.5340851866519687,
+      0.5266317133644374,
+      0.4850917896808738
+    ],
+    "val_f1_macro": 0.4707013860394839,
+    "val_accuracy": 0.4710820895522388,
+    "test_f1_macro": 0.48500669345377234,
+    "test_accuracy": 0.48504966804772126,
+    "per_class": {
+      "DOWN": {
+        "precision": 0.4501,
+        "recall": 0.537,
+        "f1": 0.4897
+      },
+      "UP": {
+        "precision": 0.5276,
+        "recall": 0.4408,
+        "f1": 0.4803
+      }
+    },
+    "per_model": {
+      "RandomForest": {
+        "cv_f1_mean": 0.49801340867748206,
+        "cv_f1_std": 0.026017783050965602,
+        "cv_acc_mean": 0.5093032888741613,
+        "fold_f1": [
+          0.48905909228601846,
+          0.49461560538306376,
+          0.5314926877770184,
+          0.5186656884310311,
+          0.45623396951027845
+        ],
+        "val_f1_macro": 0.4510836331915822,
+        "val_accuracy": 0.45242537313432835,
+        "test_f1_macro": 0.4950703674664646,
+        "test_accuracy": 0.4963310537612939
+      },
+      "LightGBM": {
+        "cv_f1_mean": 0.5109107273628897,
+        "cv_f1_std": 0.02046127527002757,
+        "cv_acc_mean": 0.5217297655538067,
+        "fold_f1": [
+          0.4876841708358637,
+          0.5210607762813046,
+          0.5340851866519687,
+          0.5266317133644374,
+          0.4850917896808738
+        ],
+        "val_f1_macro": 0.4707013860394839,
+        "val_accuracy": 0.4710820895522388,
+        "test_f1_macro": 0.48500669345377234,
+        "test_accuracy": 0.48504966804772126
+      },
+      "Stacking": {
+        "cv_f1_mean": 0.43339852930131106,
+        "cv_f1_std": 0.0,
+        "cv_acc_mean": 0.5466417910447762,
+        "fold_f1": [
+          0.43339852930131106
+        ],
+        "val_f1_macro": 0.43339852930131106,
+        "val_accuracy": 0.5466417910447762,
+        "test_f1_macro": 0.3849830452400583,
+        "test_accuracy": 0.5319223281585385
+      }
+    }
   }
 }

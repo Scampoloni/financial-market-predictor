@@ -133,7 +133,8 @@ def render() -> None:
             '<div style="color:#94a3b8;font-size:0.85rem;line-height:1.7">'
             '<b style="color:#94a3b8">Config A:</b> Market features only (baseline)<br>'
             '<b style="color:#8b5cf6">Config B:</b> + NLP sentiment features<br>'
-            '<b style="color:#10b981">Config C:</b> + CV chart embeddings<br><br>'
+            '<b style="color:#10b981">Config C:</b> + CV chart embeddings<br>'
+            '<b style="color:#f59e0b">Config D:</b> + Analyst data (corrected pipeline)<br><br>'
             'Binary classification: UP/DOWN direction more actionable '
             'and class-balanced than a continuous return target.'
             '</div></div>',

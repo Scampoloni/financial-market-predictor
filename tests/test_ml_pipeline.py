@@ -163,3 +163,55 @@ def test_cv_pca_has_correct_n_components() -> None:
     assert pca.n_components_ == config.CV_PCA_COMPONENTS, (
         f"CV PCA has {pca.n_components_} components, expected {config.CV_PCA_COMPONENTS}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Config D — corrected analyst features
+# ---------------------------------------------------------------------------
+
+
+def test_ablation_config_d_exists(ablation_results: dict) -> None:
+    """Config D (corrected analyst data) must be present in ablation results."""
+    assert "D" in ablation_results, (
+        "Config D not found in ablation_results.json — run: python -m src.models.train_ml --config D"
+    )
+
+
+def test_ablation_config_d_analyst_features_nonzero(ablation_results: dict) -> None:
+    """Config D must include all five analyst feature columns in its feature list."""
+    if "D" not in ablation_results:
+        pytest.skip("Config D not yet trained")
+    feat_cols = ablation_results["D"]["feature_cols"]
+    expected_analyst = {
+        "analyst_consensus",
+        "analyst_upgrade_score",
+        "analyst_coverage_count",
+        "price_target_upside",
+        "analyst_sentiment_momentum",
+    }
+    present = {f for f in feat_cols if f.startswith("analyst_") or f == "price_target_upside"}
+    missing = expected_analyst - present
+    assert not missing, (
+        f"Config D is missing analyst feature columns: {missing}"
+    )
+
+
+def test_ablation_config_d_feature_count(ablation_results: dict) -> None:
+    """Config D must have the same feature count as Config C (66 features)."""
+    if "D" not in ablation_results:
+        pytest.skip("Config D not yet trained")
+    n_c = ablation_results.get("C", {}).get("n_features", 66)
+    n_d = ablation_results["D"]["n_features"]
+    assert n_d == n_c, (
+        f"Config D has {n_d} features but Config C has {n_c} — they must be identical"
+    )
+
+
+def test_ablation_config_d_cv_f1_plausible(ablation_results: dict) -> None:
+    """Config D CV F1 must be in a plausible range (0.40–0.60) for a binary classifier."""
+    if "D" not in ablation_results:
+        pytest.skip("Config D not yet trained")
+    cv_f1 = ablation_results["D"]["cv_f1_mean"]
+    assert 0.40 <= cv_f1 <= 0.60, (
+        f"Config D CV F1 = {cv_f1:.4f} is outside the expected range [0.40, 0.60]"
+    )

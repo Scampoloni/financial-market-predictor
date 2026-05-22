@@ -213,8 +213,8 @@ def ablation() -> dict:
 
 
 def test_ablation_has_all_configs(ablation: dict) -> None:
-    """Ablation results must include configs A, B, and C."""
-    for cfg in ("A", "B", "C"):
+    """Ablation results must include configs A, B, C, and D."""
+    for cfg in ("A", "B", "C", "D"):
         assert cfg in ablation, f"Config {cfg!r} missing from ablation results"
 
 
