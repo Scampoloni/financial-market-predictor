@@ -854,11 +854,11 @@ def render() -> None:
         progress_bar.progress(8)
         try:
             from src.data_collection.news_scraper import collect_all
-            from src.features.nlp_features import update_single_ticker_nlp
-            collect_all([ticker])
-            update_single_ticker_nlp(ticker)
-            _load_sentiment_timeline.clear()
-            _load_ticker_news_dates.clear()
+            collect_all([ticker])          # lightweight: just saves raw headlines
+            _load_ticker_news_dates.clear()  # refresh headline display cache
+            # NOTE: we intentionally skip update_single_ticker_nlp() here —
+            # running FinBERT live exhausts Streamlit Cloud's ~1 GB RAM limit.
+            # NLP sentiment features already come from the pre-built parquet.
         except Exception:
             pass  # continue with cached news if live fetch fails
 
