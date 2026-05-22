@@ -2,16 +2,23 @@
 train_ml.py — Train all ML models and run the full ablation study.
 
 Ablation configurations:
-  Config A: market features only           (baseline)
+  Config A: market features only                              (baseline)
   Config B: market + NLP features
-  Config C: market + NLP + CV features     (full model)
+  Config C: market + NLP + CV features                       (full model, analyst data was zero)
+  Config D: market + NLP + CV + analyst (corrected)          (same 66 features as C, correct data)
+
+Config D was added after a data-pipeline bug was fixed in build_analyst_features.py.
+In the original A/B/C runs, features_analyst.parquet contained all-zero analyst values
+(rec_agg NameError silently caught). Config D re-runs Config C with the corrected parquet
+to quantify the marginal value of analyst consensus, coverage and momentum.
 
 Models: RandomForest, LightGBM (Optuna-tuned), Stacking ensemble.
 Each config is evaluated on the held-out test set (2025).
 
 Usage:
-    python -m src.models.train_ml          # full ablation
+    python -m src.models.train_ml              # full ablation (A, B, C, D)
     python -m src.models.train_ml --config A   # single config
+    python -m src.models.train_ml --config D   # Config D only
 """
 
 import json
@@ -72,7 +79,15 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
     """Load and join feature blocks for the requested config.
 
     Args:
-        config: 'A' (market only), 'B' (market + NLP), 'C' (market + NLP + CV).
+        config: One of:
+          'A' — market features only (28 features)
+          'B' — market + NLP + analyst (56 features; analyst was zero in original run)
+          'C' — market + NLP + CV + analyst (66 features; analyst was zero in original run)
+          'D' — market + NLP + CV + analyst (66 features; CORRECTED analyst parquet)
+
+        Config D uses the same feature columns as C.  The distinction is purely in
+        training data: D is run after the build_analyst_features.py bug-fix, so analyst
+        features carry real non-zero values.
 
     Returns:
         Combined DataFrame with DatetimeIndex, sorted by date.
@@ -84,6 +99,10 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
 
     if config == "A":
         return market.sort_index()
+
+    # Config D follows the same code path as C — same feature columns,
+    # different training data (corrected analyst parquet).
+    effective_config = "C" if config == "D" else config
 
     market_mi = market.set_index("ticker", append=True)
 
@@ -110,7 +129,7 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
         combined_mi[analyst_cols] = combined_mi[analyst_cols].fillna(0)
         logger.info("Joined %d analyst feature columns", len(analyst_cols))
 
-    if config == "B":
+    if effective_config == "B":
         return combined_mi.reset_index("ticker").sort_index()
 
     logger.info("Loading CV features ...")
@@ -355,7 +374,7 @@ def evaluate_model(
 # Ablation study
 # ──────────────────────────────────────────────────────────────────────────────
 
-def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
+def run_ablation(configs: list[str] = ("A", "B", "C", "D")) -> dict:
     """Run the full ablation study with multiple models per config.
 
     Trains RF, LightGBM (Optuna-tuned), and Stacking on each config.
@@ -445,18 +464,23 @@ def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
             best_test["test_f1_macro"], best_test["test_accuracy"],
         )
 
-        # Save Config C best model as production model.
-        # Filename is stacking_final.pkl for backwards compatibility (app + predict.py hardcode it),
-        # but the actual winner may be LightGBM or RandomForest — check best_model_type.
-        if config == "C":
+        # Save model artifacts.
+        # Config C: saved as stacking_final.pkl (backwards-compat name, used by live predictor).
+        # Config D: saved as stacking_final_D.pkl (corrected full model — do NOT overwrite C).
+        if config in ("C", "D"):
             MODELS_DIR.mkdir(parents=True, exist_ok=True)
-            with open(STACKING_MODEL_PATH, "wb") as f:
+            if config == "C":
+                save_path = STACKING_MODEL_PATH
+            else:
+                save_path = MODELS_DIR / "stacking_final_D.pkl"
+            with open(save_path, "wb") as f:
                 pickle.dump({
                     "model": best_model,
                     "feature_cols": feature_cols,
                     "best_model_type": best_name,
+                    "ablation_config": config,
                 }, f)
-            logger.info("Config C best model (%s) saved to %s", best_name, STACKING_MODEL_PATH)
+            logger.info("Config %s best model (%s) saved to %s", config, best_name, save_path)
 
     # Save results (without _model objects)
     ABLATION_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -513,9 +537,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Run ablation study")
-    parser.add_argument("--config", choices=["A", "B", "C"], help="Run single config")
+    parser.add_argument(
+        "--config", choices=["A", "B", "C", "D"],
+        help="Run single config (default: run all A, B, C, D)",
+    )
     args = parser.parse_args()
 
-    configs = [args.config] if args.config else ["A", "B", "C"]
+    configs = [args.config] if args.config else ["A", "B", "C", "D"]
     results = run_ablation(configs)
     print_ablation_table(results)
