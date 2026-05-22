@@ -222,50 +222,70 @@ class LivePredictor:
         return pd.Series(nlp_feat)
 
     def build_analyst_features(self, ticker: str, current_price: float | None = None) -> pd.Series:
-        """Fetch current analyst ratings and build sentiment features."""
+        """Fetch current analyst ratings and build sentiment features.
+
+        Strategy:
+          1. Load pre-computed analyst parquet (fast, always works on cloud).
+          2. Attempt live yfinance fetch for fresher data — if it succeeds,
+             override the parquet values.
+          3. Optionally enrich with live price-target upside.
+        """
         import yfinance as yf
+        from src.config import PROCESSED_DIR
         from src.data_collection.build_analyst_features import (
             build_analyst_features_for_ticker,
         )
 
-        defaults = pd.Series({
-            "analyst_consensus": 0.0,
-            "analyst_upgrade_score": 0.0,
-            "analyst_coverage_count": 0.0,
-            "price_target_upside": 0.0,
-            "analyst_sentiment_momentum": 0.0,
-        })
+        feat_cols = [
+            "analyst_consensus", "analyst_upgrade_score",
+            "analyst_coverage_count", "price_target_upside",
+            "analyst_sentiment_momentum",
+        ]
+        defaults = pd.Series({c: 0.0 for c in feat_cols})
 
+        # ── 1. Parquet fallback (reliable baseline) ─────────────────────────
+        analyst_path = PROCESSED_DIR / "features_analyst.parquet"
+        result = defaults.copy()
+        if analyst_path.exists():
+            try:
+                adf = pd.read_parquet(analyst_path)
+                ticker_rows = adf[adf["ticker"] == ticker]
+                if not ticker_rows.empty:
+                    row = ticker_rows.iloc[-1]
+                    for col in feat_cols:
+                        if col in row.index:
+                            v = row[col]
+                            result[col] = float(v) if pd.notna(v) else 0.0
+            except Exception:
+                pass  # keep defaults if parquet unreadable
+
+        # ── 2. Live fetch for more recent data ──────────────────────────────
         try:
             today = pd.Timestamp.today().normalize()
             dates = pd.date_range(end=today, periods=120, freq="B")
-            feat = build_analyst_features_for_ticker(ticker, dates)
-            if feat is None or feat.empty:
-                return defaults
-
-            latest = feat.iloc[-1].drop("ticker", errors="ignore")
-
-            # Price target upside — fetch current targets
-            if current_price and current_price > 0:
-                try:
-                    pt = yf.Ticker(ticker).analyst_price_targets
-                    if isinstance(pt, dict):
-                        mean_t = float(pt.get("mean", 0) or 0)
-                        if mean_t > 0:
-                            latest["price_target_upside"] = (mean_t - current_price) / current_price
-                except Exception:
-                    pass
-
-            result = defaults.copy()
-            for col in defaults.index:
-                if col in latest.index:
-                    v = latest[col]
-                    result[col] = float(v) if pd.notna(v) else 0.0
-            return result
-
+            live_feat = build_analyst_features_for_ticker(ticker, dates)
+            if live_feat is not None and not live_feat.empty:
+                latest = live_feat.iloc[-1].drop("ticker", errors="ignore")
+                for col in feat_cols:
+                    if col in latest.index:
+                        v = latest[col]
+                        if pd.notna(v):
+                            result[col] = float(v)
         except Exception as exc:
-            logger.warning("%s: analyst features failed (%s) — using zeros", ticker, exc)
-            return defaults
+            logger.debug("%s: live analyst fetch failed (%s) — using parquet data", ticker, exc)
+
+        # ── 3. Live price-target upside ─────────────────────────────────────
+        if current_price and current_price > 0:
+            try:
+                pt = yf.Ticker(ticker).analyst_price_targets
+                if isinstance(pt, dict):
+                    mean_t = float(pt.get("mean", 0) or 0)
+                    if mean_t > 0:
+                        result["price_target_upside"] = (mean_t - current_price) / current_price
+            except Exception:
+                pass
+
+        return result
 
     def build_cv_features(self, ticker: str, ohlcv_df: pd.DataFrame | None = None, n_pca: int = 10) -> pd.Series:
         """Generate latest chart image and extract CNN embedding.
