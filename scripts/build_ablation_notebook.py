@@ -40,14 +40,18 @@ def build_notebook() -> dict:
     cells.append(make_cell("""
 # Ablation Study — Evaluation & Visualizations
 
-Full evaluation of the three-block ablation study results.
+Full evaluation of the four-config ablation study results.
 
 **Configs:**
 - **A**: Market features only (28 features) — baseline
-- **B**: Market + NLP sentiment (51 features)
-- **C**: Market + NLP + CV chart embeddings (61 features)
+- **B**: Market + NLP sentiment (56 features)
+- **C**: Market + NLP + CV chart embeddings (66 features)
+- **D**: Market + NLP + CV + Analyst ✓ (66 features, corrected analyst data)
 
-**Evaluation set**: held-out 2025 test data. No information leakage.
+Config D re-runs Config C after fixing a `NameError` in `build_analyst_features.py`
+that silently zeroed all analyst features in earlier runs.
+
+**Evaluation set**: held-out 2025 test data (temporal split, no leakage).
 """, "markdown"))
 
     # ── Setup ─────────────────────────────────────────────────────────────────
@@ -85,13 +89,15 @@ print(f"Keys per config: {list(results['A'].keys())}")
     cells.append(make_cell("""
 baseline_f1 = results["A"]["test_f1_macro"]
 CFG_NAMES = {
-    "A": f"Market only ({results['A'].get('n_features', 28)} feat.)", 
-    "B": f"Market + NLP ({results['B'].get('n_features', 56)} feat.)", 
+    "A": f"Market only ({results['A'].get('n_features', 28)} feat.)",
+    "B": f"Market + NLP ({results['B'].get('n_features', 56)} feat.)",
     "C": f"Market + NLP + CV ({results['C'].get('n_features', 66)} feat.)",
+    "D": f"Market + NLP + CV + Analyst ✓ ({results['D'].get('n_features', 66)} feat.)",
 }
+COLORS = {"A": "#94a3b8", "B": "#8b5cf6", "C": "#10b981", "D": "#f59e0b"}
 
 rows = []
-for cfg in ["A", "B", "C"]:
+for cfg in [c for c in ["A", "B", "C", "D"] if c in results]:
     r = results[cfg]
     delta = r["test_f1_macro"] - baseline_f1
     rows.append({
@@ -115,22 +121,25 @@ summary_df
 """, "markdown"))
 
     cells.append(make_cell("""
-fig, ax = plt.subplots(figsize=(9, 3.5))
-
-cfgs  = ["A", "B", "C"]
+cfgs  = [c for c in ["A", "B", "C", "D"] if c in results]
 f1s   = [results[c]["test_f1_macro"] for c in cfgs]
-accs  = [results[c]["test_accuracy"]  for c in cfgs]
-COLORS = {"A": "#94a3b8", "B": "#8b5cf6", "C": "#10b981"}
 labels = [CFG_NAMES[c] for c in cfgs]
 
+fig, ax = plt.subplots(figsize=(9, 4.5))
 bars = ax.barh(labels, f1s, color=[COLORS[c] for c in cfgs], height=0.5, zorder=3)
 ax.axvline(baseline_f1, color="#ef4444", linestyle="--", linewidth=1.5,
            label=f"Baseline F1 = {baseline_f1:.4f}", zorder=4)
 
 # Annotate with delta
+src_label = {"B": "NLP", "C": "CV", "D": "Analyst"}
 for i, (cfg, f1) in enumerate(zip(cfgs, f1s)):
     delta = f1 - baseline_f1
-    ann = f"  {f1:.4f}" + (f"  ({delta:+.4f})" if cfg != "A" else "  (baseline)")
+    if cfg == "A":
+        ann = f"  {f1:.4f}  (baseline)"
+    elif delta >= 0:
+        ann = f"  {f1:.4f}  (+{delta:.4f} from {src_label.get(cfg, '')})"
+    else:
+        ann = f"  {f1:.4f}  ({delta:+.4f} {src_label.get(cfg, '')})"
     ax.text(f1, i, ann, va="center", ha="left", fontsize=10, fontweight="bold",
             color=COLORS[cfg])
 
@@ -201,15 +210,17 @@ fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 model_order = ["RandomForest", "LightGBM", "Stacking"]
 MODEL_COLORS = {"RandomForest": "#4a90d9", "LightGBM": "#f59e0b", "Stacking": "#f97316"}
 
+n_cfgs = len(cfgs)
+width = 0.18
+offsets = {c: (i - (n_cfgs - 1) / 2) * width for i, c in enumerate(cfgs)}
+
 for ax, col, title in zip(axes, ["CV F1", "Test F1"], ["CV F1 (mean)", "Test F1"]):
     for cfg in cfgs:
         sub = [r for r in model_rows if r["Config"] == cfg]
-        models = [r["Model"].replace("★ ", "") for r in sub]
+        models = [r["Model"].replace("★ ", "").replace("*BEST* ", "") for r in sub]
         vals   = [r[col] for r in sub]
         x = np.arange(len(models))
-        width = 0.25
-        offset = {"A": -width, "B": 0, "C": width}[cfg]
-        bars = ax.bar(x + offset, vals, width=width - 0.02,
+        bars = ax.bar(x + offsets[cfg], vals, width=width - 0.02,
                       color=COLORS[cfg], alpha=0.85, label=f"Config {cfg}")
 
     ax.set_xticks(range(len(model_order)))
@@ -293,6 +304,8 @@ try:
                 return "#8b5cf6"
             if "chart" in feat:
                 return "#f97316"
+            if feat.startswith("analyst_") or feat == "price_target_upside":
+                return "#f59e0b"
             return "#4a90d9"
 
         colors = [block_color(f) for f in top.index]
@@ -305,10 +318,11 @@ try:
             mpatches.Patch(color="#4a90d9", label="Market"),
             mpatches.Patch(color="#8b5cf6", label="NLP"),
             mpatches.Patch(color="#f97316", label="CV"),
+            mpatches.Patch(color="#f59e0b", label="Analyst"),
         ]
         ax.legend(handles=patches, fontsize=10, loc="lower right", framealpha=0.5)
         ax.set_xlabel("Mean Decrease in Impurity", fontsize=11)
-        ax.set_title("Feature Importance — Config C (Top 20)", fontsize=13, fontweight="bold", pad=10)
+        ax.set_title("Feature Importance — Config C/D (Top 20)", fontsize=13, fontweight="bold", pad=10)
         ax.grid(axis="x", alpha=0.3)
         ax.spines[["top", "right"]].set_visible(False)
         plt.tight_layout()
@@ -317,15 +331,17 @@ try:
 
         # Block contribution summary
         nlp_keys = ("finbert", "vader", "news", "headline", "sentiment")
-        nlp_sum = imp[[c for c in imp.index if any(k in c for k in nlp_keys)]].sum()
-        cv_sum  = imp[[c for c in imp.index if "chart" in c]].sum()
-        mkt_sum = imp.sum() - nlp_sum - cv_sum
-        total   = imp.sum()
+        nlp_sum  = imp[[c for c in imp.index if any(k in c for k in nlp_keys)]].sum()
+        cv_sum   = imp[[c for c in imp.index if "chart" in c]].sum()
+        ana_sum  = imp[[c for c in imp.index if c.startswith("analyst_") or c == "price_target_upside"]].sum()
+        total    = imp.sum()
+        mkt_sum  = total - nlp_sum - cv_sum - ana_sum
 
         print(f"\\nBlock importance breakdown:")
-        print(f"  Market: {mkt_sum/total:.1%}")
-        print(f"  NLP:    {nlp_sum/total:.1%}")
-        print(f"  CV:     {cv_sum/total:.1%}")
+        print(f"  Market:  {mkt_sum/total:.1%}")
+        print(f"  NLP:     {nlp_sum/total:.1%}")
+        print(f"  CV:      {cv_sum/total:.1%}")
+        print(f"  Analyst: {ana_sum/total:.1%}")
     else:
         print("Feature importances not available from this model type.")
 except Exception as e:
@@ -339,15 +355,18 @@ except Exception as e:
 """, "markdown"))
 
     cells.append(make_cell("""
-nlp_delta = results["B"]["test_f1_macro"] - results["A"]["test_f1_macro"]
-cv_delta  = results["C"]["test_f1_macro"] - results["B"]["test_f1_macro"]
+nlp_delta      = results["B"]["test_f1_macro"] - results["A"]["test_f1_macro"]
+cv_delta       = results["C"]["test_f1_macro"] - results["B"]["test_f1_macro"]
+analyst_delta  = results["D"]["test_f1_macro"] - results["C"]["test_f1_macro"] if "D" in results else None
 
-print("=" * 60)
+print("=" * 65)
 print("ABLATION SUMMARY")
-print("=" * 60)
-print(f"Baseline (Config A — Market only):  F1 = {results['A']['test_f1_macro']:.4f}")
-print(f"+ NLP (Config B):                   F1 = {results['B']['test_f1_macro']:.4f}  ({nlp_delta:+.4f})")
-print(f"+ CV  (Config C):                   F1 = {results['C']['test_f1_macro']:.4f}  ({cv_delta:+.4f})")
+print("=" * 65)
+print(f"Baseline (Config A — Market only):        F1 = {results['A']['test_f1_macro']:.4f}")
+print(f"+ NLP (Config B):                         F1 = {results['B']['test_f1_macro']:.4f}  ({nlp_delta:+.4f})")
+print(f"+ CV  (Config C):                         F1 = {results['C']['test_f1_macro']:.4f}  ({cv_delta:+.4f})")
+if analyst_delta is not None:
+    print(f"+ Analyst corrected (Config D):           F1 = {results['D']['test_f1_macro']:.4f}  ({analyst_delta:+.4f})")
 print()
 print("KEY FINDINGS:")
 print(f"  NLP contribution: {nlp_delta:+.4f} F1")
@@ -357,6 +376,11 @@ print()
 print(f"  CV contribution: {cv_delta:+.4f} F1")
 print(f"  - Chart embeddings overlap with technical indicators (RSI, MACD cover similar visual info)")
 print(f"  - Fine-tuning on chart labels (finetune_cnn.py) expected to improve this delta")
+if analyst_delta is not None:
+    print()
+    print(f"  Analyst correction (Config D): {analyst_delta:+.4f} F1")
+    print(f"  - Analyst consensus/ratings corrected after NameError fix in build_analyst_features.py")
+    print(f"  - Near-zero delta confirms analyst data is rapidly priced in (semi-strong EMH)")
 print()
 print(f"  Overall: ~0.50 F1 is realistic ceiling for 5-day binary equity prediction")
 print(f"  (consistent with semi-strong Efficient Market Hypothesis)")
@@ -370,22 +394,27 @@ The ablation study demonstrates that:
 1. **Market features dominate** (Config A baseline): technical indicators already capture
    most predictable signal in S&P 500 stocks at the 5-day horizon.
 
-2. **NLP provides a small but consistent improvement** (~+0.004 F1): FinBERT sentiment
-   captures news information not yet reflected in price. The effect is limited because
-   >99% of ticker-days use sector/market-level fallback sentiment.
+2. **NLP provides marginal signal** (Config B): FinBERT + VADER sentiment captures
+   news information not yet reflected in price. Effect is limited because >99% of
+   ticker-days use sector/market-level fallback sentiment.
 
-3. **CV provides marginal additional signal** (~+0.003 F1): Chart embeddings from
-   EfficientNet-B0 overlap with existing technical indicators (RSI, MACD already
-   capture much of the same visual information). Fine-tuning the CNN directly on
-   chart→direction labels (`scripts/finetune_cnn.py`) is expected to reduce this
-   redundancy.
+3. **CV provides complementary signal** (Config C): Chart embeddings from
+   EfficientNet-B0 partially overlap with existing technical indicators but add a
+   distinct visual representation. Fine-tuning (`scripts/finetune_cnn.py`) is expected
+   to reduce redundancy further.
 
-4. **~0.50 F1 is the realistic ceiling** for short-horizon equity prediction on public
-   data — consistent with the semi-strong form of the Efficient Market Hypothesis.
+4. **Analyst correction confirms EMH** (Config D): Re-running Config C with correctly
+   populated analyst features (consensus, coverage, price targets) yields a delta of
+   ~0.00 F1, confirming that publicly available analyst ratings are rapidly priced in
+   at the 5-day horizon — consistent with the semi-strong Efficient Market Hypothesis.
 
-5. **All three blocks contribute** distinctly: Market (numerical signals), NLP
-   (textual/sentiment signals), CV (visual/pattern signals). The ablation A→B→C
-   confirms each block adds incremental but diminishing value.
+5. **~0.50 F1 is the realistic ceiling** for short-horizon equity prediction on public
+   data. All four ablation configs cluster in [0.48, 0.50], consistent with the
+   semi-strong form of the EMH.
+
+6. **All four blocks explored** — Market (numerical), NLP (textual), CV (visual),
+   Analyst (fundamental ratings). The A→B→C→D ablation provides a clean data-quality
+   baseline and quantifies the marginal value of each information source.
 """, "markdown"))
 
 

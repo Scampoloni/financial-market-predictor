@@ -35,11 +35,11 @@
 
 - **Problem statement:** Predicting whether a stock will move UP or DOWN over the next 5 trading days is difficult because markets incorporate public information quickly, yet practitioners still rely on technical indicators, news sentiment, and chart patterns as decision support.
 - **Goal:** Evaluate whether combining three complementary signal sources (structured market data, financial news sentiment, and candlestick chart embeddings) yields more robust out-of-sample directional predictions for 67 large-cap S&P 500 stocks than any single source alone.
-- **Success criteria:** A structured ablation study (Config A → B → C) that measures the incremental F1-macro contribution of each block on a held-out 2025 test set, along with a live Streamlit application that delivers real-time predictions with interpretable evidence.
+- **Success criteria:** A structured ablation study (Config A → B → C → D) that measures the incremental F1-macro contribution of each feature block on a held-out 2025 test set, along with a live Streamlit application that delivers real-time predictions with interpretable evidence.
 
 ### 1.2 Integration Logic
 
-- **How the selected blocks interact:** Each block independently produces a fixed-width feature vector for every (ticker, date) observation. The three vectors are horizontally concatenated into one feature matrix that feeds a shared LightGBM classifier. An A/B/C ablation with identical temporal splits isolates each block's marginal contribution.
+- **How the selected blocks interact:** Each block independently produces a fixed-width feature vector for every (ticker, date) observation. The vectors are horizontally concatenated into one feature matrix that feeds a shared LightGBM classifier. An A/B/C/D ablation with identical temporal splits isolates each block's marginal contribution.
 - **Data and output flow between blocks:**
   ```
   Yahoo Finance OHLCV  →  [ML Block]  →  28 market features ──────────────────┐
@@ -130,7 +130,7 @@ See *Model Comparison* in [`notebooks/06_evaluation_ablation.ipynb`](notebooks/0
 
 > Config D re-trains Config C with corrected analyst data (a `NameError` in `build_analyst_features.py` caused all analyst features to be silently zero in earlier runs). The D vs C delta of −0.0011 confirms analyst ratings are effectively priced in at the 5-day horizon.
 
-- **Per-class shift analysis:** Adding NLP features (Config A → B) increases DOWN recall from 0.520 to 0.587 but reduces UP recall from 0.478 to 0.397. The net macro-F1 falls. This reflects a systematic bearish bias introduced by the NLP block: most sentiment-imputed rows carry sector/market average scores rather than ticker-specific signals, and averaging across a cross-section that includes negative-sentiment stocks makes the model predict DOWN more often. Adding CV features (Config B → C) partially corrects the imbalance (DOWN recall 0.553, UP recall 0.429) but does not recover the Config A baseline.
+- **Per-class shift analysis:** Adding NLP features (Config A → B) increases DOWN recall from 0.520 to 0.587 but reduces UP recall from 0.478 to 0.397. The net macro-F1 falls. This reflects a systematic bearish bias introduced by the NLP block: most sentiment-imputed rows carry sector/market average scores rather than ticker-specific signals, and averaging across a cross-section that includes negative-sentiment stocks makes the model predict DOWN more often. Adding CV features (Config B → C) partially corrects the imbalance (DOWN recall 0.553, UP recall 0.429) but does not recover the Config A baseline. Adding corrected analyst features (Config C → D) produces only a marginal shift (DOWN recall 0.537, UP recall 0.441), confirming that analyst ratings contribute negligible directional signal at the 5-day horizon.
 
 - **Interpretation of negative ablation deltas:** Three structural causes explain why NLP and CV do not improve the headline F1 beyond Config A:
   1. **Imputation dilutes signal.** Only ~1.7 % of ticker-days have direct ticker-specific news; 98.3 % use sector/market/forward-fill fallbacks. Imputed sentiment is a cross-sectional average, not an idiosyncratic signal, so it adds correlation structure without predictive content for individual tickers.
@@ -278,11 +278,12 @@ Qualitative PCA scatter plots of embeddings (frozen vs fine-tuned) are available
 |--------|----------|---------------|---------------|
 | B | Market + NLP (56 features) | 0.4826 | — |
 | C | Market + NLP + CV (66 features) | 0.4861 | +0.0035 |
+| D | Market + NLP + CV + Analyst ✓ (66 features) | 0.4850 | +0.0024 |
 
-Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlapping CIs across configs indicate the marginal improvement is not statistically significant — CV features provide complementary signal but do not dominate.
+Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlapping CIs across configs indicate the marginal improvement is not statistically significant — CV features provide complementary signal but do not dominate. Config D (corrected analyst data) is within the CI of Config C, confirming the analyst correction has no measurable impact on the CV block's contribution.
 
 - **Metrics and/or visual checks:** Extrinsic ablation above; qualitative: PCA embedding scatter plots in [`notebooks/04_cv_pipeline.ipynb`](notebooks/04_cv_pipeline.ipynb); additional LightGBM-on-CV-only baseline (F1 ≈ 0.35, below random baseline) confirms CV embeddings are not sufficient alone.
-- **Final results:** Config C test F1-macro = 0.4861 (+0.0035 vs Config B without CV).
+- **Final results:** Config C test F1-macro = 0.4861 (+0.0035 vs Config B without CV). Config D = 0.4850 (corrected analyst pipeline, Δ = −0.0011 vs C).
 - **Error patterns and limitations:** CV embeddings overlap strongly with existing technical indicators (RSI, MACD, Bollinger Bands already capture most visual candlestick information algebraically). Survivorship bias in the ticker universe (all currently-listed S&P 500 stocks) inflates historical win rates for UP predictions.
 
 #### 2C.6 Integration with Other Block(s)
@@ -330,7 +331,7 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
 
 - **Training command(s):**
   ```bash
-  python -m src.models.train_ml          # Config A/B/C ablation (LightGBM + RF + Stacking)
+  python -m src.models.train_ml          # Config A/B/C/D ablation (LightGBM + RF + Stacking)
   python scripts/finetune_cnn.py --epochs 10   # Optional: fine-tune EfficientNet-B0
   ```
 

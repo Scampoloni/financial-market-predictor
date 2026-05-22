@@ -18,7 +18,7 @@ An end-to-end AI application that predicts **5-day stock price direction (UP/DOW
 
 ## What it does
 
-The system tests the hypothesis that combining three independent "views" of the market — technical indicators, language-based sentiment, and visual chart patterns — yields more robust predictions than any single modality alone. An ablation study (Configs A → B → C) quantifies each block's incremental contribution on a held-out 2025 test set.
+The system tests the hypothesis that combining three independent "views" of the market — technical indicators, language-based sentiment, and visual chart patterns — yields more robust predictions than any single modality alone. An ablation study (Configs A → B → C → D) quantifies each block's incremental contribution on a held-out 2025 test set.
 
 **Streamlit app includes:**
 - Live predictions for any of the 67 tracked tickers
