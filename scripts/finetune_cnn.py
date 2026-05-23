@@ -38,7 +38,6 @@ import torch
 import torch.nn as nn
 from PIL import Image
 from sklearn.metrics import f1_score, accuracy_score, classification_report
-from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 
@@ -264,9 +263,16 @@ def main(
     lr_backbone: float = 3e-5,
     unfreeze_epoch: int = 3,
     n_unfreeze_blocks: int = 2,
-    val_split: float = 0.15,
+    train_end: str = "2023-12-31",
     seed: int = 42,
 ) -> None:
+    """Fine-tune EfficientNet-B0 with a temporal train/val split.
+
+    Train period: all chart dates ≤ train_end (default 2023-12-31).
+    Val period:   chart dates 2024-01-01 to TRAIN_END (2024-06-30).
+    This mirrors the ablation study's temporal split and prevents any
+    future-data leakage into CNN training.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -274,7 +280,7 @@ def main(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Device: %s", device)
 
-    # ── Build dataset ────────────────────────────────────────────────────────
+    # ── Build dataset (all items up to TRAIN_END = 2024-06-30) ──────────────
     all_items = build_dataset(tickers)
     if len(all_items) < 50:
         logger.error(
@@ -282,12 +288,33 @@ def main(
         )
         return
 
-    random.shuffle(all_items)
-    train_items, val_items = train_test_split(
-        all_items, test_size=val_split, random_state=seed,
-        stratify=[label for _, label in all_items],
+    # Temporal split: train on ≤ train_end, validate on > train_end
+    # Both sets stay within TRAIN_END (2024-06-30) to avoid test leakage.
+    train_cutoff_ts = pd.Timestamp(train_end)
+    train_items = [
+        (p, lbl) for p, lbl in all_items
+        if pd.Timestamp(p.stem) <= train_cutoff_ts
+    ]
+    val_items = [
+        (p, lbl) for p, lbl in all_items
+        if pd.Timestamp(p.stem) > train_cutoff_ts
+    ]
+
+    if len(train_items) < 20 or len(val_items) < 10:
+        logger.warning(
+            "Temporal split yielded too few samples (train=%d, val=%d). "
+            "Falling back to last-15%% as val by date.",
+            len(train_items), len(val_items),
+        )
+        all_items_sorted = sorted(all_items, key=lambda x: x[0].stem)
+        cutoff_idx = int(len(all_items_sorted) * 0.85)
+        train_items = all_items_sorted[:cutoff_idx]
+        val_items   = all_items_sorted[cutoff_idx:]
+
+    logger.info(
+        "Temporal split — Train: %d (≤ %s)  |  Val: %d (> %s)",
+        len(train_items), train_end, len(val_items), train_end,
     )
-    logger.info("Train: %d  |  Val: %d", len(train_items), len(val_items))
 
     train_ds = ChartDataset(train_items, transform=_TRAIN_TRANSFORM)
     val_ds   = ChartDataset(val_items, transform=_VAL_TRANSFORM)
@@ -376,13 +403,14 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fine-tune EfficientNet-B0 on chart images")
-    parser.add_argument("--epochs",    type=int,   default=10, help="Total training epochs")
-    parser.add_argument("--batch",     type=int,   default=32, help="Batch size")
-    parser.add_argument("--lr",        type=float, default=1e-3, help="Head learning rate")
-    parser.add_argument("--lr-bb",     type=float, default=3e-5, help="Backbone learning rate (after unfreezing)")
-    parser.add_argument("--unfreeze-epoch", type=int, default=3, help="Epoch at which backbone blocks are unfrozen")
-    parser.add_argument("--n-blocks",  type=int,   default=2, help="Number of backbone blocks to unfreeze")
-    parser.add_argument("--tickers",   nargs="+",  default=None, help="Subset of tickers (default: all)")
+    parser.add_argument("--epochs",      type=int,   default=10,           help="Total training epochs")
+    parser.add_argument("--batch",       type=int,   default=32,           help="Batch size")
+    parser.add_argument("--lr",          type=float, default=1e-3,         help="Head learning rate")
+    parser.add_argument("--lr-bb",       type=float, default=3e-5,         help="Backbone learning rate (after unfreezing)")
+    parser.add_argument("--unfreeze-epoch", type=int, default=3,           help="Epoch at which backbone blocks are unfrozen")
+    parser.add_argument("--n-blocks",    type=int,   default=2,            help="Number of backbone blocks to unfreeze")
+    parser.add_argument("--train-end",   type=str,   default="2023-12-31", help="Temporal train/val cutoff date (val = dates after this)")
+    parser.add_argument("--tickers",     nargs="+",  default=None,         help="Subset of tickers (default: all)")
     args = parser.parse_args()
 
     tickers = args.tickers or TICKERS_ALL
@@ -394,4 +422,5 @@ if __name__ == "__main__":
         lr_backbone=args.lr_bb,
         unfreeze_epoch=args.unfreeze_epoch,
         n_unfreeze_blocks=args.n_blocks,
+        train_end=args.train_end,
     )

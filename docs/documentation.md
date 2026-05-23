@@ -79,7 +79,7 @@ Data collection: [`src/data_collection/market_collector.py`](src/data_collection
 
 See *Feature Engineering* in [`notebooks/02_ml_baseline.ipynb`](notebooks/02_ml_baseline.ipynb).
 
-**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, SIDEWAYS observations are excluded and the task is reduced to binary UP / DOWN classification. This halves noise and raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py`](src/features/market_features.py) for the target construction logic.
+**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, the SIDEWAYS class is eliminated: all observations are reclassified as binary UP (5-day return > 0 %) / DOWN (return ≤ 0 %). No rows are dropped — the ±1 % zone (~23 % of data) is redistributed into UP/DOWN by sign rather than filtered out. This simplification raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py`](src/features/market_features.py) lines 273–294 for the target construction logic.
 
 #### EDA Key Findings
 
@@ -91,7 +91,7 @@ Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 | Dataset start | 2020-03-13 (not 2020-01-01) | SMA-50 warm-up consumes first ~50 trading days — rows dropped intentionally |
 | Missing values | 0 % across all feature columns | No imputation required before training |
 | Return kurtosis | 13.05 (Gaussian = 3) | Fat tails → classification preferred over regression; tree models preferred |
-| Target distribution | UP 43.1 %, DOWN 33.9 %, SIDEWAYS 23.0 % | S&P 500 upward drift; macro-F1 + class weights required |
+| Target distribution (v1 3-class) | UP 43.1 %, DOWN 33.9 %, SIDEWAYS 23.0 % | S&P 500 upward drift; v2 binary: UP ≈ 56 %, DOWN ≈ 44 % after SIDEWAYS redistribution; macro-F1 + class weights used |
 | Feature–target correlations | All \|r\| < 0.2 | No dominant linear signal — non-linear model (LightGBM) required |
 | SMA ratio inter-correlation | ~0.85–0.95 (sma\_20, sma\_50, ema\_12) | Redundant for trees; kept — LightGBM handles collinearity internally |
 | High-VIX periods → UP rate | 50.1 % (vs 43.1 % base rate) | VIX captures snap-back rallies; kept as continuous feature |
@@ -104,14 +104,14 @@ Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 - **Models tested:** RandomForest (GridSearchCV), LightGBM (Optuna, 40 trials), StackingClassifier (RF + XGB + LGB meta-ensemble).
 - **Why these models were chosen:** All three are strong on tabular data with mixed feature types. LightGBM handles large datasets efficiently and is well-suited to financial time series. Stacking tests whether complementary learner biases can be exploited.
 
-See [`src/models/train_ml.py`](src/models/train_ml.py) for training logic and [`src/config.py`](src/config.py) for hyperparameter grids.
+See [`src/models/train_ml.py`](src/models/train_ml.py) (RF: `train_random_forest` line 164; LightGBM + Optuna: `train_lightgbm` / `_optuna_lgb` lines 194–255; Stacking: `train_stacking` lines 256–333; ablation runner: `run_ablation` line 377) for training logic and [`src/config.py`](src/config.py) for hyperparameter grids.
 
 #### 2A.4 Model Comparison and Iterations
 
 | Iteration | Objective | Key changes | Models used | Main metric | Change vs previous |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Establish baseline with raw OHLCV | 3-class target (UP / DOWN / SIDEWAYS where \|5-day return\| ≤ 1 %), next-day horizon | RandomForest | CV F1-macro ≈ 0.33 | — |
-| 2 | Improve signal-to-noise | **SIDEWAYS rows dropped** (±1 % threshold produced ~23 % neutral rows with little predictive structure); switch to binary 5-day UP/DOWN; add technical indicators (RSI, MACD, Bollinger) | RandomForest, XGBoost | CV F1-macro ≈ 0.49 | +0.16 |
+| 2 | Improve signal-to-noise | SIDEWAYS class eliminated: all rows reclassified as binary UP (return > 0 %) / DOWN (return ≤ 0 %); ±1 % zone (~23 % of data) redistributed by sign rather than dropped; switch to 5-day horizon; add technical indicators (RSI, MACD, Bollinger) | RandomForest, XGBoost | CV F1-macro ≈ 0.49 | +0.16 |
 | 3 | Systematic hyperparameter optimisation | Optuna tuning for LightGBM; TimeSeriesSplit CV; Stacking ensemble | RF, LightGBM, Stacking | Test F1-macro = 0.4970 (LightGBM best) | +0.007 vs iteration 2 |
 
 See *Model Comparison* in [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
@@ -314,6 +314,8 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
   python -m venv .venv && source .venv/bin/activate   # Linux/Mac
   # or: .venv\Scripts\activate                         # Windows
   pip install -r requirements.txt
+  # For byte-exact reproducibility use pinned versions instead:
+  # pip install -r requirements-pinned.txt
   cp .env.example .env
   # Windows PowerShell: Copy-Item .env.example .env
   # Edit .env: add NEWS_API_KEY and (optional) CLAUDE_API_KEY

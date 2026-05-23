@@ -10,8 +10,9 @@ Features produced per ticker-day:
   chart_available        — 1 if a chart image exists for this date, 0 otherwise
 
 Usage:
-    python -m src.features.cv_features --test   # AAPL, MSFT, NVDA
-    python -m src.features.cv_features          # all tickers
+    python -m src.features.cv_features                    # all tickers, frozen ImageNet backbone
+    python -m src.features.cv_features --test             # AAPL, MSFT, NVDA (smoke test)
+    python -m src.features.cv_features --finetuned        # use fine-tuned CNN (run finetune_cnn.py first)
 """
 
 import logging
@@ -143,6 +144,7 @@ def build_all_cv_features(
     output_path: Path = FEATURES_CV_PATH,
     n_pca: int = CV_PCA_COMPONENTS,
     train_cutoff: str = "2024-06-30",
+    use_finetuned: bool | None = None,
 ) -> pd.DataFrame:
     """Build the full CV feature matrix for all tickers and save to Parquet.
 
@@ -158,11 +160,15 @@ def build_all_cv_features(
         market_path: Market features path for date alignment.
         output_path: Output Parquet path.
         n_pca: Number of PCA components.
+        use_finetuned: ``True`` = force fine-tuned backbone from
+            ``models/cnn_finetuned.pth`` (run ``scripts/finetune_cnn.py`` first);
+            ``False`` = force frozen ImageNet weights;
+            ``None`` (default) = auto-select (fine-tuned if file exists).
 
     Returns:
         Combined CV feature DataFrame.
     """
-    cnn = ChartCNN()
+    cnn = ChartCNN(use_finetuned=use_finetuned)
     all_frames: list[pd.DataFrame] = []
     all_embeddings: list[np.ndarray] = []
 
@@ -258,7 +264,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Build CV feature matrix")
     parser.add_argument("--test", action="store_true", help="3-ticker smoke test")
+    parser.add_argument(
+        "--finetuned",
+        action="store_true",
+        help="Use fine-tuned CNN backbone from models/cnn_finetuned.pth "
+             "(run scripts/finetune_cnn.py first)",
+    )
     args = parser.parse_args()
 
     tickers = TEST_TICKERS if args.test else TICKERS_ALL
-    build_all_cv_features(tickers=tickers)
+    build_all_cv_features(tickers=tickers, use_finetuned=True if args.finetuned else None)

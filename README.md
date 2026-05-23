@@ -112,7 +112,8 @@ STREAMLIT APP
 ```
 financial-market-predictor/
 ├── app.py                          # Streamlit entry point
-├── requirements.txt
+├── requirements.txt                # flexible (>=) versions
+├── requirements-pinned.txt         # exact pinned versions for reproducibility
 ├── .env.example                    # API key template
 ├── src/
 │   ├── config.py                   # Central config (paths, tickers, hyperparameters)
@@ -248,6 +249,7 @@ cd financial-market-predictor
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+# For byte-exact reproducibility: pip install -r requirements-pinned.txt
 cp .env.example .env             # Windows PowerShell: Copy-Item .env.example .env
 # then add NEWS_API_KEY and optionally CLAUDE_API_KEY
 ```
