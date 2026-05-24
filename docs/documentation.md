@@ -94,14 +94,14 @@ Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 | Target distribution (v1 3-class) | UP 43.1 %, DOWN 33.9 %, SIDEWAYS 23.0 % | S&P 500 upward drift; v2 binary: UP ≈ 56 %, DOWN ≈ 44 % after SIDEWAYS redistribution; macro-F1 + class weights used |
 | Feature–target correlations | All \|r\| < 0.2 | No dominant linear signal — non-linear model (LightGBM) required |
 | SMA ratio inter-correlation | ~0.85–0.95 (sma\_20, sma\_50, ema\_12) | Redundant for trees; kept — LightGBM handles collinearity internally |
-| High-VIX periods → UP rate | 50.1 % (vs 43.1 % base rate) | VIX captures snap-back rallies; kept as continuous feature |
-| RSI < 30 → UP rate | 52.1 % (vs 43.1 % base rate) | Strong mean-reversion signal: 8–11 pp above base rate |
+| High-VIX periods → UP rate | 50.1 % (vs 43.1 % v1 base rate) | VIX captures snap-back rallies in v1 data; v2 binary base rate ≈ 56 %, so VIX effect is smaller but direction preserved — kept as continuous feature |
+| RSI < 30 → UP rate | 52.1 % (vs 43.1 % v1 base rate) | Mean-reversion signal in v1 data; in v2 binary (base rate ≈ 56 %), RSI < 30 → 52.1 % is modestly below base rate — mean-reversion remains useful as a relative feature but oversold stocks trend DOWN less often than the market average |
 | Extreme moves (>\|10 %\|) | 455 rows (0.47 %) | Real market events — kept; tree models are robust to outliers via rank splits |
 | Panel balance | Exactly 1,453 rows per ticker (Std = 0.0) | Perfect panel — no ticker-specific data gaps |
 
 #### 2A.3 Model Selection
 
-- **Models tested:** RandomForest (GridSearchCV), LightGBM (Optuna, 40 trials), StackingClassifier (RF + XGB + LGB meta-ensemble).
+- **Models tested:** RandomForest (fixed hyperparameters, cross-validated via 5-fold TimeSeriesSplit), LightGBM (Optuna, 40 trials), StackingClassifier (RF + XGB + LGB meta-ensemble).
 - **Why these models were chosen:** All three are strong on tabular data with mixed feature types. LightGBM handles large datasets efficiently and is well-suited to financial time series. Stacking tests whether complementary learner biases can be exploited.
 
 See [`src/models/train_ml.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py) (RF: [`train_random_forest` L164](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L164); LightGBM + Optuna: [`_optuna_lgb` L194](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L194); Stacking: [`train_stacking` L256](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L256); ablation runner: [`run_ablation` L377](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L377)) for training logic and [`src/config.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/config.py) for hyperparameter grids.
@@ -129,6 +129,16 @@ See *Model Comparison* in [`notebooks/06_evaluation_ablation.ipynb`](notebooks/0
 | **D** — + Analyst ✓ (corrected) | 66 | 0.4850 | 0.4850 | 0.4897 | 0.4803 |
 
 > Config D re-trains Config C with corrected analyst data (a `NameError` in `build_analyst_features.py` caused all analyst features to be silently zero in earlier runs). The D vs C delta of −0.0011 confirms analyst ratings are effectively priced in at the 5-day horizon.
+
+**Per-model breakdown (val F1 → test F1, Config A as representative):**
+
+| Model | Val F1 | Test F1 | Notes |
+|-------|:------:|:-------:|-------|
+| LightGBM (Optuna) | 0.4771 | **0.4970** | ✓ Selected — best val F1 in all four configs |
+| RandomForest (fixed params) | 0.4402 | 0.4928 | Competitive test F1 but lower val F1 |
+| Stacking (RF + XGB + LGB) | 0.4207 | 0.3796 | Dramatically underperforms — KFold leakage in stacking |
+
+The stacking ensemble uses `cv=5` (KFold) internally to generate cross-val meta-features because `TimeSeriesSplit` is incompatible with `StackingClassifier`. In a temporal financial dataset, KFold allows future data to inform base learner training, creating an optimistic val score that does not generalise — test F1 drops to 0.38–0.42 across all configs. LightGBM (Optuna-tuned, TimeSeriesSplit CV) wins all four configs and is the deployed model.
 
 - **Per-class shift analysis:** Adding NLP features (Config A → B) increases DOWN recall from 0.520 to 0.587 but reduces UP recall from 0.478 to 0.397. The net macro-F1 falls. This reflects a systematic bearish bias introduced by the NLP block: most sentiment-imputed rows carry sector/market average scores rather than ticker-specific signals, and averaging across a cross-section that includes negative-sentiment stocks makes the model predict DOWN more often. Adding CV features (Config B → C) partially corrects the imbalance (DOWN recall 0.553, UP recall 0.429) but does not recover the Config A baseline. Adding corrected analyst features (Config C → D) produces only a marginal shift (DOWN recall 0.537, UP recall 0.441), confirming that analyst ratings contribute negligible directional signal at the 5-day horizon.
 
@@ -182,7 +192,7 @@ Total corpus: ~8,550 headline-rows stored in `data/raw/news/`.
 
   Rows that rely on tier 2–4 are flagged by `is_sentiment_imputed = 1` in the NLP feature matrix. The net effect: Config B achieves complete row coverage but with a weak, aggregated signal for the majority of observations — the primary reason NLP adds noise rather than predictive lift (−0.0143 F1 vs Config A).
 
-- **Analyst data (5 additional features):** `analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside` — structured signals derived from analyst rating data, joined to the NLP feature matrix. Together with the 23 text-derived features this yields 28 NLP-block features total.
+- **Analyst data (5 additional features):** `analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside` — structured signals derived from analyst rating data, persisted separately in [`data/processed/features_analyst.parquet`](data/processed/features_analyst.parquet) and joined to the NLP feature matrix at training time. Together with the 23 text-derived features this yields 28 NLP-block features total.
 - **PCA note:** FinBERT embedding PCA (10 components) is fitted on training-period rows only (date ≤ 2024-06-30); val/test rows are transformed using the saved scaler/PCA without re-fitting ([`src/features/nlp_features.py`](src/features/nlp_features.py)). This eliminates any temporal leakage from test-period embedding distributions.
 
 #### 2B.3 Approach Selection
@@ -222,7 +232,7 @@ Config B (Market + NLP) test F1-macro = 0.4826 (−0.0143 vs Config A baseline).
 #### 2B.6 Integration with Other Block(s)
 
 - **Inputs received from other block(s):** Ticker symbol and date index from the ML block (used to align sentiment features temporally).
-- **Outputs provided to other block(s):** 28-feature NLP vector per (ticker, date) — 23 sentiment/embedding features plus 5 analyst-data features (`analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside`) — persisted in [`data/processed/features_nlp.parquet`](data/processed/features_nlp.parquet), concatenated with market features to produce the Config B/C feature matrix.
+- **Outputs provided to other block(s):** 28-feature NLP vector per (ticker, date) — 23 sentiment/embedding features persisted in [`data/processed/features_nlp.parquet`](data/processed/features_nlp.parquet), plus 5 analyst-data features (`analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside`) persisted separately in [`data/processed/features_analyst.parquet`](data/processed/features_analyst.parquet). Both files are joined during training to produce the complete 28-feature NLP input for Configs B, C, and D.
 
 ---
 
@@ -382,7 +392,7 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
   ```
   Expected output: `ALL CHECKS PASSED — results match documentation.`
 
-- **Reproducibility notes:** Python 3.11+. All random seeds fixed via [`src/config.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/config.py). Pre-computed artifacts are committed to the repository (`models/`, `data/processed/`) so the app can be launched without re-running the full pipeline. For byte-exact reproducibility use `requirements-pinned.txt`.
+- **Reproducibility notes:** Python 3.10+. All random seeds fixed via [`src/config.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/config.py). Pre-computed artifacts are committed to the repository (`models/`, `data/processed/`) so the app can be launched without re-running the full pipeline. For byte-exact reproducibility use `requirements-pinned.txt`.
 
 ---
 

@@ -68,7 +68,7 @@ MODEL_21D_PATH = MODELS_DIR / "model_21d.pkl"
 SCALER_PATH = MODELS_DIR / "scaler.pkl"
 PCA_NLP_PATH = MODELS_DIR / "pca_nlp.pkl"
 PCA_CV_PATH = MODELS_DIR / "pca_cv.pkl"
-CHART_CNN_PATH = MODELS_DIR / "chart_cnn.pth"
+CHART_CNN_PATH = MODELS_DIR / "cnn_finetuned.pth"   # fine-tuned EfficientNet-B0 weights
 
 # ---------------------------------------------------------------------------
 # API Keys (loaded from .env)
@@ -276,7 +276,7 @@ MIN_STOCK_PRICE = 5.0
 # ---------------------------------------------------------------------------
 CHART_WINDOW_DAYS = 30          # candlestick chart covers 30 trading days
 CHART_IMAGE_SIZE = (224, 224)   # pixels (standard for ResNet/EfficientNet)
-CHART_PATTERN_CLASSES = ["uptrend", "downtrend", "sideways", "reversal"]
+CHART_PATTERN_CLASSES = ["DOWN", "UP"]   # binary target (v1 had 4 classes; v2 uses binary UP/DOWN)
 CHART_LABEL_THRESHOLD = 0.02    # >2% in 5 days → uptrend / downtrend
 
 # ---------------------------------------------------------------------------
@@ -287,8 +287,7 @@ CV_FOLDS = 5  # TimeSeriesSplit folds
 LOGISTIC_REGRESSION_PARAMS = {
     "C": [0.01, 0.1, 1, 10],
     "max_iter": 1000,
-    "solver": "lbfgs",
-    "multi_class": "multinomial",
+    "solver": "lbfgs",   # binary classification; multi_class param not needed
 }
 
 RANDOM_FOREST_PARAMS = {

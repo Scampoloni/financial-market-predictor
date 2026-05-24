@@ -96,7 +96,7 @@ UNIFIED FEATURE MATRIX (per ticker-date)
 └── Config C: 66 features  (+ CV)      ← full multimodal configuration
 
 MODEL TRAINING (identical split across all configs)
-├── RandomForest       (GridSearch-tuned)
+├── RandomForest       (fixed hyperparameters, TimeSeriesSplit CV)
 ├── LightGBM           (Optuna, 40 trials)
 └── StackingClassifier (RF + XGB + LGB meta-ensemble)
     5-fold TimeSeriesSplit · Train ≤ 2024-06, Val 2024H2, Test 2025
