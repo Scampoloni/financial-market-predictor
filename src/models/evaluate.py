@@ -14,7 +14,6 @@ from sklearn.metrics import (
     confusion_matrix,
     classification_report,
     f1_score,
-    accuracy_score,
 )
 
 

@@ -20,13 +20,11 @@ from __future__ import annotations
 
 import logging
 import time
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
-from src.config import YFINANCE_CACHE_DIR  # ensures project-local yfinance cache setup
 
 logging.basicConfig(
     level=logging.INFO,
@@ -145,11 +143,8 @@ def build_analyst_features_for_ticker(
         agg_consensus = None
 
     # ── 3. Current price target ──────────────────────────────────────────────
-    mean_target = None
-    if has_history and "currentPriceTarget" in ud.columns:
-        latest_targets = ud["currentPriceTarget"].dropna()
-        if not latest_targets.empty:
-            mean_target = float(latest_targets.iloc[-1])
+    # price_target_upside is filled after joining close prices in main().
+    # Capture the latest consensus target for downstream use if needed.
 
     if not has_history and agg_consensus is None:
         return None

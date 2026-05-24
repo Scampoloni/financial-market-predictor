@@ -110,7 +110,7 @@ class FinBertPipeline:
 
             # ProsusAI/finbert label order: positive=0, negative=1, neutral=2
             for prob_row in probs:
-                pos, neg, neu = prob_row[0], prob_row[1], prob_row[2]
+                pos, neg, _neu = prob_row[0], prob_row[1], prob_row[2]
                 label_idx = int(prob_row.argmax())
                 label = FINBERT_LABELS[label_idx]
                 # Compound score: positive contribution - negative contribution

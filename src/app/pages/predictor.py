@@ -695,7 +695,6 @@ def _render_backtest(ticker: str, horizon: int) -> None:
 
         # ── Metric cards ─────────────────────────────────────────────────
         overall_acc = bt["correct"].mean()
-        up_mask = bt["predicted"] == "UP"
         tp = ((bt["predicted"] == "UP") & (bt["actual"] == "UP")).sum()
         fp = ((bt["predicted"] == "UP") & (bt["actual"] == "DOWN")).sum()
         fn = ((bt["predicted"] == "DOWN") & (bt["actual"] == "UP")).sum()

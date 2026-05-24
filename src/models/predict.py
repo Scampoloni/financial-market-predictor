@@ -16,17 +16,14 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from src.config import (
     FEATURES_NLP_PATH,
     LIVE_DATA_LOOKBACK_DAYS,
     MODEL_21D_PATH,
-    MODELS_DIR,
     PCA_CV_PATH,
     PCA_NLP_PATH,
-    RAW_NEWS_DIR,
     STACKING_MODEL_PATH,
 )
 

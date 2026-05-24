@@ -10,7 +10,6 @@ Usage:
     python scripts/train_21d.py
 """
 
-import json
 import logging
 import pickle
 import sys
@@ -35,7 +34,6 @@ from src.config import (
     FEATURES_NLP_PATH,
     MODEL_21D_PATH,
     MODELS_DIR,
-    PROCESSED_DIR,
     RAW_MARKET_DIR,
     TEST_START,
     TRAIN_END,
@@ -300,7 +298,7 @@ def main():
 
     # ── Print summary ─────────────────────────────────────────────────────────
     print("\n" + "=" * 72)
-    print(f"21-DAY MODEL RESULTS")
+    print("21-DAY MODEL RESULTS")
     print("=" * 72)
     print(f"{'Model':<16} {'CV F1':>12}  {'Val F1':>10}  {'Test F1':>10}  {'Test Acc':>10}")
     print("-" * 72)

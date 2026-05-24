@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pickle
 
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -219,7 +218,6 @@ def render() -> None:
         # Importance breakdown by block
         nlp_keys = ("finbert", "vader", "news", "headline", "sentiment")
         cv_keys = ("chart",)
-        analyst_keys = ("analyst_",)
         nlp_pct = importances[[c for c in importances.index if any(k in c for k in nlp_keys)]].sum()
         cv_pct = importances[[c for c in importances.index if any(k in c for k in cv_keys)]].sum()
         analyst_pct = importances[[c for c in importances.index if c.startswith("analyst_")]].sum()

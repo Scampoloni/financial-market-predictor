@@ -25,7 +25,6 @@ from src.config import (
     RAW_NEWS_DIR,
     RSS_FEEDS,
     TICKERS_ALL,
-    TICKER_SECTOR_MAP,
 )
 
 logging.basicConfig(

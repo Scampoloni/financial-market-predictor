@@ -111,7 +111,7 @@ def render() -> None:
         fetch_live_btn = False
         if ticker_filter:
             fetch_live_btn = st.button("🔄 Fetch Live News for Ticker", help=f"Downloads the latest news for {ticker_filter} into the index.")
-            
+
     if fetch_live_btn and ticker_filter:
         with st.spinner(f"Fetching latest news for {ticker_filter}..."):
             try:

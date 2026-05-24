@@ -320,8 +320,8 @@ def main(
     val_ds   = ChartDataset(val_items, transform=_VAL_TRANSFORM)
 
     # Class weights for imbalanced labels
-    n_down = sum(1 for _, l in train_items if l == 0)
-    n_up   = sum(1 for _, l in train_items if l == 1)
+    n_down = sum(1 for _, lbl in train_items if lbl == 0)
+    n_up   = sum(1 for _, lbl in train_items if lbl == 1)
     total  = n_down + n_up
     weight = torch.tensor(
         [total / (2 * n_down), total / (2 * n_up)], dtype=torch.float32

@@ -34,7 +34,6 @@ Usage:
 import logging
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -48,7 +47,7 @@ from src.config import (
     TICKER_SECTOR_MAP,
     TICKERS_ALL,
 )
-from src.nlp.finbert_sentiment import FinBertPipeline, FINBERT_CACHE_PATH
+from src.nlp.finbert_sentiment import FinBertPipeline
 from src.nlp.vader_sentiment import VaderPipeline
 
 logger = logging.getLogger(__name__)
@@ -444,32 +443,32 @@ def update_single_ticker_nlp(
     output_path: Path = FEATURES_NLP_PATH,
 ) -> None:
     """Live-update NLP features for a single ticker efficiently.
-    
+
     Computes features from the newest raw news, applies saved PCA,
     and updates only the relevant rows in the master NLP parquet.
     """
     logger.info("Live updating NLP features for %s ...", ticker)
-    
+
     # 1. Build features for the single ticker
     new_feat = build_ticker_nlp_features(ticker, news_dir=news_dir, market_path=market_path)
     if new_feat is None or new_feat.empty:
         logger.warning("No NLP features generated for %s.", ticker)
         return
-        
+
     # 2. Add dynamic features
     new_feat["is_sentiment_imputed"] = 0.0
     new_feat["sentiment_shift_3d"] = (new_feat["finbert_sentiment"] - new_feat["finbert_sentiment"].shift(3)).fillna(0)
-    
+
     vol_mean = new_feat["news_volume_1d"].rolling(20, min_periods=5).mean()
     vol_std = new_feat["news_volume_1d"].rolling(20, min_periods=5).std()
     new_feat["news_volume_zscore"] = ((new_feat["news_volume_1d"] - vol_mean) / (vol_std + 1e-8)).fillna(0)
-    
+
     roll_mean = new_feat["finbert_sentiment"].rolling(20, min_periods=5).mean()
     roll_std = new_feat["finbert_sentiment"].rolling(20, min_periods=5).std()
     new_feat["sentiment_surprise"] = ((new_feat["finbert_sentiment"] - roll_mean) / (roll_std + 1e-8)).fillna(0)
-    
+
     new_feat["sentiment_x_volume"] = (new_feat["finbert_sentiment"] * new_feat["news_volume_1d"]).fillna(0)
-    
+
     # 3. Apply cached PCA
     embed_cols = [c for c in new_feat.columns if c.startswith("embed_")]
     if embed_cols and PCA_CACHE_PATH.exists():
@@ -478,10 +477,10 @@ def update_single_ticker_nlp(
             cache = pickle.load(f)
         scaler = cache["scaler"]
         pca = cache["pca"]
-        
+
         for i in range(pca.n_components_):
             new_feat[f"finbert_embed_pca_{i+1}"] = 0.0
-            
+
         rows_with_news = new_feat["news_volume_1d"] > 0
         if rows_with_news.any():
             embed_matrix = new_feat.loc[rows_with_news, embed_cols].fillna(0).values
@@ -489,10 +488,10 @@ def update_single_ticker_nlp(
             pca_result = pca.transform(embed_scaled)
             for i in range(pca.n_components_):
                 new_feat.loc[rows_with_news, f"finbert_embed_pca_{i+1}"] = pca_result[:, i]
-                
+
     if embed_cols:
         new_feat = new_feat.drop(columns=embed_cols)
-        
+
     # 4. Update master parquet
     if output_path.exists():
         master = pd.read_parquet(output_path)
@@ -500,7 +499,7 @@ def update_single_ticker_nlp(
         updated = pd.concat([master, new_feat])
     else:
         updated = new_feat
-        
+
     updated.to_parquet(output_path)
     logger.info("Updated NLP features for %s successfully.", ticker)
 

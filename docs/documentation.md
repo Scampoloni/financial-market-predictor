@@ -62,7 +62,7 @@ See *Block Integration* in [`notebooks/05_integrated_model.ipynb`](notebooks/05_
 | 1 | [Yahoo Finance via yfinance](https://finance.yahoo.com) | OHLCV time series (CSV) | 69 files · ~2020–2026 · 67 tickers + ^VIX + ^GSPC | Primary feature source: price returns, volume, VIX |
 | 2 | Sector classification (GICS, embedded in config) | Categorical metadata | 67 rows × 7 sectors | One-hot sector dummies added to feature matrix |
 
-Data collection: [`src/data_collection/market_collector.py`](src/data_collection/market_collector.py)
+Data collection: [`src/data_collection/market_collector.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/data_collection/market_collector.py)
 
 #### 2A.2 Preprocessing and Features
 
@@ -79,7 +79,7 @@ Data collection: [`src/data_collection/market_collector.py`](src/data_collection
 
 See *Feature Engineering* in [`notebooks/02_ml_baseline.ipynb`](notebooks/02_ml_baseline.ipynb).
 
-**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, the SIDEWAYS class is eliminated: all observations are reclassified as binary UP (5-day return > 0 %) / DOWN (return ≤ 0 %). No rows are dropped — the ±1 % zone (~23 % of data) is redistributed into UP/DOWN by sign rather than filtered out. This simplification raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py`](src/features/market_features.py) lines 273–294 for the target construction logic.
+**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, the SIDEWAYS class is eliminated: all observations are reclassified as binary UP (5-day return > 0 %) / DOWN (return ≤ 0 %). No rows are dropped — the ±1 % zone (~23 % of data) is redistributed into UP/DOWN by sign rather than filtered out. This simplification raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py` L273–294](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/features/market_features.py#L273-L294) for the target construction logic.
 
 #### EDA Key Findings
 
@@ -104,7 +104,7 @@ Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 - **Models tested:** RandomForest (GridSearchCV), LightGBM (Optuna, 40 trials), StackingClassifier (RF + XGB + LGB meta-ensemble).
 - **Why these models were chosen:** All three are strong on tabular data with mixed feature types. LightGBM handles large datasets efficiently and is well-suited to financial time series. Stacking tests whether complementary learner biases can be exploited.
 
-See [`src/models/train_ml.py`](src/models/train_ml.py) (RF: `train_random_forest` line 164; LightGBM + Optuna: `train_lightgbm` / `_optuna_lgb` lines 194–255; Stacking: `train_stacking` lines 256–333; ablation runner: `run_ablation` line 377) for training logic and [`src/config.py`](src/config.py) for hyperparameter grids.
+See [`src/models/train_ml.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py) (RF: [`train_random_forest` L164](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L164); LightGBM + Optuna: [`_optuna_lgb` L194](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L194); Stacking: [`train_stacking` L256](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L256); ablation runner: [`run_ablation` L377](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L377)) for training logic and [`src/config.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/config.py) for hyperparameter grids.
 
 #### 2A.4 Model Comparison and Iterations
 
@@ -235,14 +235,14 @@ Config B (Market + NLP) test F1-macro = 0.4826 (−0.0143 vs Config A baseline).
 | 1 | Generated candlestick charts (mplfinance, from Yahoo Finance OHLCV) | PNG images (30-day rolling windows, bi-daily step) | 61,640+ images @ 224×224 px | Input to EfficientNet-B0 feature extractor |
 | 2 | [EfficientNet-B0](https://pytorch.org/vision/stable/models/efficientnet.html) (torchvision, domain-fine-tuned) | Pre-trained CNN backbone | ~16.3 MB fine-tuned weights | Visual feature extraction model |
 
-Chart generation: [`src/data_collection/chart_generator.py`](src/data_collection/chart_generator.py).  
-Fine-tuning script: [`scripts/finetune_cnn.py`](scripts/finetune_cnn.py).
+Chart generation: [`src/data_collection/chart_generator.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/data_collection/chart_generator.py).
+Fine-tuning script: [`scripts/finetune_cnn.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/scripts/finetune_cnn.py).
 
 #### 2C.2 Preprocessing and Augmentation
 
-- **Image preprocessing:** 30-day OHLCV window rendered as a dark-background candlestick PNG (224×224 px) using mplfinance. Images are normalised with ImageNet mean/std before EfficientNet inference. See [`src/cv/chart_classifier.py`](src/cv/chart_classifier.py).
+- **Image preprocessing:** 30-day OHLCV window rendered as a dark-background candlestick PNG (224×224 px) using mplfinance. Images are normalised with ImageNet mean/std before EfficientNet inference. See [`src/cv/chart_classifier.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/cv/chart_classifier.py).
 - **Augmentation strategy:** No data augmentation during inference. During CNN fine-tuning (`scripts/finetune_cnn.py`): random horizontal flip, colour jitter (brightness/contrast ±0.2), random rotation ±5°. Augmentation is conservative to preserve chart semantics.
-- **PCA note:** EfficientNet embedding PCA (10 components) is fitted on training-period rows only (date ≤ 2024-06-30); val/test rows are transformed using the saved scaler/PCA without re-fitting ([`src/features/cv_features.py`](src/features/cv_features.py)). This eliminates any temporal leakage from test-period embedding distributions.
+- **PCA note:** EfficientNet embedding PCA (10 components) is fitted on training-period rows only (date ≤ 2024-06-30); val/test rows are transformed using the saved scaler/PCA without re-fitting ([`src/features/cv_features.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/features/cv_features.py)). This eliminates any temporal leakage from test-period embedding distributions.
 
 #### 2C.3 Model Selection
 
@@ -261,12 +261,12 @@ Fine-tuning script: [`scripts/finetune_cnn.py`](scripts/finetune_cnn.py).
 
 **Intrinsic (fine-tuning validation):**
 
-`scripts/finetune_cnn.py` uses a stratified 85 / 15 train–val split and reports per-epoch validation accuracy and macro F1. The best checkpoint (by val F1) is written to `models/cnn_finetuned.pth` with its metric persisted inside the file.
+[`scripts/finetune_cnn.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/scripts/finetune_cnn.py) uses a **temporal train/val split** that mirrors the ablation protocol: charts with date ≤ 2023-12-31 go to train; charts from 2024-01-01 to 2024-06-30 go to validation. This prevents any future-data leakage into CNN training. Per-epoch validation accuracy and macro F1 are reported; the best checkpoint (by val F1) is written to `models/cnn_finetuned.pth` with its metric persisted inside the file.
 
-| Split | Samples | Best val F1-macro | Epochs |
-|-------|---------|:-----------------:|:------:|
-| Train | 36,960 | — | 10 |
-| Val | ~6,522 | **0.538** | best at checkpoint |
+| Split | Period | Best val F1-macro | Epochs |
+|-------|--------|:-----------------:|:------:|
+| Train | ≤ 2023-12-31 | — | 10 |
+| Val | 2024-01-01–2024-06-30 | **0.538** | best at checkpoint |
 
 Fine-tuning training strategy: head-only for epochs 1–3 (lr = 1e-3), then top-2 EfficientNet blocks unfrozen for epochs 4–10 (backbone lr = 3e-5, head lr = 1e-3). Class weights applied to CrossEntropyLoss to handle UP/DOWN imbalance.
 
@@ -354,7 +354,13 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
   pytest tests/ -q   # 76 tests (no downloads required)
   ```
 
-- **Reproducibility notes:** Python 3.11+. All random seeds fixed via `src/config.py`. Pre-computed artifacts are committed to the repository (`models/`, `data/processed/`) so the app can be launched without re-running the full pipeline.
+- **Verify committed results (no data download needed):**
+  ```bash
+  python scripts/verify_results.py   # checks all headline F1 metrics against documentation
+  ```
+  Expected output: `ALL CHECKS PASSED — results match documentation.`
+
+- **Reproducibility notes:** Python 3.11+. All random seeds fixed via [`src/config.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/config.py). Pre-computed artifacts are committed to the repository (`models/`, `data/processed/`) so the app can be launched without re-running the full pipeline. For byte-exact reproducibility use `requirements-pinned.txt`.
 
 ---
 
@@ -363,7 +369,31 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
 - [x] Third selected block implemented with strong quality — Computer Vision (EfficientNet-B0, domain fine-tuning, bi-daily chart generation, PCA compression, full ablation measurement).
 - [x] More than two data sources used with clear added value — Yahoo Finance OHLCV, RSS feeds, NewsAPI, FinBERT (HuggingFace), EfficientNet-B0 (torchvision) with fine-tuning on domain data.
 - [x] Extended evaluation — Bootstrap 95 % CI (N = 2,000), 5-fold TimeSeriesSplit, per-class precision/recall/F1, multi-horizon comparison (5-day vs 21-day), per-class shift analysis (DOWN/UP recall trade-off across configs), statistical significance of ablation deltas. See [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
-- [x] Ethics, bias, or fairness analysis — Documented in `README.md`: survivorship bias (currently-listed S&P 500 only), English-language news concentration, market access inequality, EMH interpretation of ~0.50 F1. System carries an explicit "not financial advice" disclaimer in the app.
+- [x] Ethics, bias, or fairness analysis — See dedicated Section 6 below.
 - [x] Comprehensive test suite — 76 pytest tests covering feature parquet contracts (column names, value ranges, binary flags), ablation result validity (including Config D), 21-day model bundle contracts, VADER and FinBERT pipeline output format, CV PCA dimension and variance checks, temporal split non-overlap, and model artifact integrity. All tests run without network access or GPU. See [`tests/`](tests/).
 
 Evidence for selected bonus items: full ablation results in [`data/processed/ablation_results.json`](data/processed/ablation_results.json); evaluation visualisations in [`data/processed/ablation_f1_bar.png`](data/processed/ablation_f1_bar.png), [`data/processed/per_class_performance.png`](data/processed/per_class_performance.png), [`data/processed/feature_importance.png`](data/processed/feature_importance.png), [`data/processed/bootstrap_ci.png`](data/processed/bootstrap_ci.png).
+
+---
+
+## 6. Ethics, Bias, and Fairness
+
+> **This is a research prototype. It is not a financial adviser, not a trading signal, and must never be used for real capital allocation.** The app carries an explicit disclaimer on every page.
+
+### 6.1 Data Bias
+
+- **Survivorship bias:** The ticker universe consists of 67 currently-listed S&P 500 large-caps. Companies that were delisted, went bankrupt, or were removed from the index between 2020 and 2026 are absent. This biases the training distribution toward historically successful firms and may overstate UP prediction reliability — fallen stocks, which would produce DOWN labels, are invisible to the model.
+- **English-language concentration:** All news inputs come from English-language RSS feeds and NewsAPI, dominated by US financial media (Reuters, MarketWatch, Yahoo Finance). Non-English coverage of the same companies — particularly relevant for companies with significant European or Asian operations — is invisible to the NLP block, which may distort sentiment for multinational firms.
+- **Source concentration:** A small number of high-volume news feeds account for most headlines. Sentiment driven by niche, regional, or specialised outlets is under-represented. A story breaking first in a domain-specific publication may not reach the model's pipeline in time to predict the associated price move.
+- **Temporal distribution shift:** The model is trained on 2020–2024 data that includes the COVID-19 crash, post-pandemic recovery, and aggressive Fed rate cycles — exceptional macro regimes. Performance on future data under different macro conditions (e.g. prolonged low-volatility, deflationary environments) is not guaranteed.
+
+### 6.2 Model Fairness and Market Access
+
+- **Retail vs institutional inequality:** Institutional investors operate with sub-millisecond latency feeds, proprietary alternative data (satellite imagery, credit-card transaction data, earn-call audio NLP), and larger compute budgets than the public sources used here. Any signal captured by this model is likely already arbitraged away at the institutional level. Retail investors who act on model predictions without understanding the ~0.50 F1 ceiling and the EMH context could incur losses.
+- **Amplification risk (self-fulfilling prophecy):** If this model — or a similar public model — were deployed at scale and its predictions widely followed, coordinated buy/sell signals from many users acting simultaneously could move prices in the predicted direction, not because the model is accurate, but because of coordinated action. This feedback loop would corrupt future evaluation and could amplify market volatility.
+
+### 6.3 Limitations and Honest Scope
+
+- **Accuracy ceiling:** ~0.50 F1 on 5-day directional prediction is consistent with the semi-strong Efficient Market Hypothesis (EMH): public information is rapidly priced in, leaving little exploitable signal in the publicly-available inputs used here. The Config D analyst features result (Δ = −0.0011 vs Config C) is a direct empirical confirmation: even professional analyst ratings — which represent significant analytical effort — add no measurable predictive value at the 5-day horizon.
+- **No causal claims:** All model outputs are correlational. A high UP probability does not mean the model has identified a causal driver of the price move; it means the feature pattern resembles historical UP episodes.
+- **Not a trading system:** The model outputs directional probabilities, not position sizes, entry/exit rules, or risk management logic. Translating a probability into a trading decision requires additional infrastructure (risk limits, transaction costs, portfolio constraints) that is outside the scope of this project.

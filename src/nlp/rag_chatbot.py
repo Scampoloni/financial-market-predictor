@@ -279,7 +279,7 @@ class FinancialRAG:
             load_dotenv()
         except ImportError:
             pass
-            
+
         # Build context from retrieved headlines
         context = "\n".join(
             f"[{s['ticker']} | {s['published'][:10]}] {s['headline']}"

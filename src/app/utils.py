@@ -8,14 +8,12 @@ import pandas as pd
 
 import streamlit as st
 
-from pathlib import Path
 
 from src.config import (
     FEATURES_MARKET_PATH,
     FEATURES_NLP_PATH,
     FEATURES_CV_PATH,
     TICKERS_ALL,
-    TICKER_SECTOR_MAP,
     PROCESSED_DIR,
 )
 
