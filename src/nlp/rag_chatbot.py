@@ -326,11 +326,19 @@ class FinancialRAG:
             except Exception as exc:
                 logger.warning("Claude API error: %s", exc)
 
-        # Try OpenAI fallback
+        # Try OpenAI fallback (optional — requires: pip install openai)
         openai_key = os.getenv("OPENAI_API_KEY")
         if openai_key:
             try:
-                import openai
+                import openai  # optional dependency; not required when only Claude is used
+            except ImportError:
+                logger.warning(
+                    "openai package not installed. "
+                    "Install with: pip install openai>=1.0.0"
+                )
+                openai_key = None  # skip fallback
+        if openai_key:
+            try:
                 client = openai.OpenAI(api_key=openai_key)
                 resp = client.chat.completions.create(
                     model="gpt-4o-mini",
