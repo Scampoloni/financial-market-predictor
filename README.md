@@ -71,7 +71,7 @@ Model selection is performed **exclusively on the validation set (2024H2)** usin
 |------|------------|---------|
 | 5-fold TimeSeriesSplit | Train ≤ 2024-06 | Cross-validated F1 to guide Optuna trials |
 | Val 2024H2 | 2024-07 – 2024-12 | **Model selection** (`selection_metric = val_f1_macro`) |
-| Test 2025 | 2025-01 – 2025-12 | **Final evaluation — evaluated exactly once** |
+| Test 2025+ | ≥ 2025-01 (n=20,033 rows, through 2026-03-13) | **Final evaluation — evaluated exactly once** |
 
 Evidence: `data/processed/ablation_results.json` records `selection_metric: "val_f1_macro"` for Configs A, B, and C. No test-set information is used to pick or tune any model.
 

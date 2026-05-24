@@ -42,7 +42,7 @@ from src.config import (
     FEATURES_MARKET_PATH,
     FEATURES_NLP_PATH,
     NLP_PCA_COMPONENTS,
-    PROCESSED_DIR,
+    PCA_NLP_PATH,
     RAW_NEWS_DIR,
     TICKER_SECTOR_MAP,
     TICKERS_ALL,
@@ -59,8 +59,8 @@ logging.basicConfig(
 
 TEST_TICKERS = ["AAPL", "MSFT", "NVDA"]
 
-# PCA model cache
-PCA_CACHE_PATH = PROCESSED_DIR / "pca_nlp_embeddings.pkl"
+# PCA model cache — path defined in config.py (= PROCESSED_DIR / "pca_nlp_embeddings.pkl")
+PCA_CACHE_PATH = PCA_NLP_PATH
 
 
 def _load_scored_news(ticker: str, news_dir: Path) -> pd.DataFrame:

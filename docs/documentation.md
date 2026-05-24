@@ -87,7 +87,7 @@ Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 
 | Finding | Value | Implication for modelling |
 |---------|-------|--------------------------|
-| Dataset scale | 97,351 ticker-day rows; 67 tickers, 7 sectors, 2020–2025 | Sufficient for robust ML across multiple market regimes |
+| Dataset scale | 101,036 ticker-day rows; 67 tickers, 7 sectors, 2020–2026 | Sufficient for robust ML across multiple market regimes |
 | Dataset start | 2020-03-13 (not 2020-01-01) | SMA-50 warm-up consumes first ~50 trading days — rows dropped intentionally |
 | Missing values | 0 % across all feature columns | No imputation required before training |
 | Return kurtosis | 13.05 (Gaussian = 3) | Fat tails → classification preferred over regression; tree models preferred |
@@ -97,7 +97,7 @@ Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 | High-VIX periods → UP rate | 50.1 % (vs 43.1 % v1 base rate) | VIX captures snap-back rallies in v1 data; v2 binary base rate ≈ 56 %, so VIX effect is smaller but direction preserved — kept as continuous feature |
 | RSI < 30 → UP rate | 52.1 % (vs 43.1 % v1 base rate) | Mean-reversion signal in v1 data; in v2 binary (base rate ≈ 56 %), RSI < 30 → 52.1 % is modestly below base rate — mean-reversion remains useful as a relative feature but oversold stocks trend DOWN less often than the market average |
 | Extreme moves (>\|10 %\|) | 455 rows (0.47 %) | Real market events — kept; tree models are robust to outliers via rank splits |
-| Panel balance | Exactly 1,453 rows per ticker (Std = 0.0) | Perfect panel — no ticker-specific data gaps |
+| Panel balance | Exactly 1,508 rows per ticker (Std = 0.0) | Perfect panel — no ticker-specific data gaps |
 
 #### 2A.3 Model Selection
 
@@ -156,7 +156,7 @@ Ablation results stored in [`data/processed/ablation_results.json`](data/process
 #### 2A.6 Integration with Other Block(s)
 
 - **Inputs received from other block(s):** None — this block operates solely on market data.
-- **Outputs provided to other block(s):** 28-feature vector per (ticker, date) row, persisted in [`data/processed/features_market.parquet`](data/processed/features_market.parquet), joined with NLP and CV features for Configs B and C.
+- **Outputs provided to other block(s):** 28-feature vector per (ticker, date) row, persisted in [`data/processed/features_market.parquet`](data/processed/features_market.parquet), joined with NLP and CV features for Configs B, C, and D.
 
 ---
 
@@ -169,7 +169,7 @@ Ablation results stored in [`data/processed/ablation_results.json`](data/process
 | 1 | RSS financial news feeds (Yahoo Finance, Reuters, CNBC, Seeking Alpha) | Unstructured text (headlines) | ~6,200 headlines across 67 tickers | Primary sentiment signal |
 | 2 | [NewsAPI](https://newsapi.org) | Unstructured text (headlines + snippets) | ~2,350 additional headlines | Supplementary coverage for low-news tickers |
 | 3 | [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert) (HuggingFace) | Pre-trained transformer model | ~440 MB | Sentiment scoring model |
-| 4 | [Yahoo Finance via yfinance](https://finance.yahoo.com) — `ticker.upgrades_downgrades` + `ticker.recommendations` | Analyst rating time series (structured) | 67 tickers × ~1,453 dates; historical firm-level upgrades/downgrades + monthly consensus counts | 5 analyst features: `analyst_consensus`, `analyst_upgrade_score`, `analyst_coverage_count`, `price_target_upside`, `analyst_sentiment_momentum` |
+| 4 | [Yahoo Finance via yfinance](https://finance.yahoo.com) — `ticker.upgrades_downgrades` + `ticker.recommendations` | Analyst rating time series (structured) | 67 tickers × ~1,508 dates; historical firm-level upgrades/downgrades + monthly consensus counts | 5 analyst features: `analyst_consensus`, `analyst_upgrade_score`, `analyst_coverage_count`, `price_target_upside`, `analyst_sentiment_momentum` |
 
 News collection: [`src/data_collection/news_scraper.py`](src/data_collection/news_scraper.py).  
 Analyst feature builder: [`src/data_collection/build_analyst_features.py`](src/data_collection/build_analyst_features.py).  
@@ -180,7 +180,7 @@ Total corpus: ~8,550 headline-rows stored in `data/raw/news/`.
 - **Text preprocessing:** Lower-case normalisation; removal of boilerplate ticker mentions; deduplication by headline hash; 512-token truncation for FinBERT. See [`src/nlp/finbert_sentiment.py`](src/nlp/finbert_sentiment.py).
 - **Prompt design or retrieval setup:** No generative prompting for the sentiment pipeline. For the RAG chatbot ([`src/nlp/rag_chatbot.py`](src/nlp/rag_chatbot.py)): headlines are chunked and embedded with `sentence-transformers/all-MiniLM-L6-v2`; top-5 retrieved chunks are prepended to a Claude API call. Coverage fallback hierarchy: ticker-level → sector-average → market-average → forward-fill.
 
-  **NLP sentiment coverage by fallback tier** (out of 97,351 total ticker-day rows):
+  **NLP sentiment coverage by fallback tier** (out of 101,036 total ticker-day rows):
 
   | Tier | Source | Approx. ticker-day coverage |
   |------|--------|:---------------------------:|
