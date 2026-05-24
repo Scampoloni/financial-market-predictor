@@ -268,6 +268,28 @@ Fine-tuning script: [`scripts/finetune_cnn.py`](https://github.com/Scampoloni/fi
 | Train | ≤ 2023-12-31 | — | 10 |
 | Val | 2024-01-01–2024-06-30 | **0.538** | best at checkpoint |
 
+**Held-out evaluation (2025 charts):**
+
+Because `val F1 = 0.538` was the criterion used to *select* the best checkpoint, it cannot also serve as an independent estimate of generalisation — a classic selection-on-validation problem. To obtain a clean, unbiased performance number, the fine-tuned classifier was re-evaluated on all chart images dated **2025-01-01 or later** — a window entirely outside both the training period (≤ 2023-12-31) and the validation window (2024-H1) used during fine-tuning.
+
+[`scripts/eval_cv_held_out.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/scripts/eval_cv_held_out.py) loads the classifier head intact (not stripped), scans `data/raw/charts/` for matching 2025 PNGs, and runs batch inference. Results on **n = 11 993** charts:
+
+| Metric | Value |
+|--------|------:|
+| Accuracy | 0.5147 |
+| F1-macro | **0.5057** |
+| F1 DOWN | 0.4390 |
+| F1 UP | 0.5724 |
+
+Confusion matrix (rows = actual, cols = predicted):
+
+|  | Pred DOWN | Pred UP |
+|--|----------:|--------:|
+| **Actual DOWN** | 2 277 | 3 143 |
+| **Actual UP** | 2 677 | 3 896 |
+
+The model shows a systematic **UP-prediction bias** (recall UP = 0.59 vs DOWN = 0.42), consistent with the class imbalance in the training data (UP ≈ 55 %). F1-macro = 0.506 lies only marginally above the random baseline (0.50), confirming that chart pattern alone has limited predictive power — in line with the extrinsic ablation results above. Full metrics are persisted in [`data/processed/cv_held_out_eval.json`](data/processed/cv_held_out_eval.json).
+
 Fine-tuning training strategy: head-only for epochs 1–3 (lr = 1e-3), then top-2 EfficientNet blocks unfrozen for epochs 4–10 (backbone lr = 3e-5, head lr = 1e-3). Class weights applied to CrossEntropyLoss to handle UP/DOWN imbalance.
 
 Qualitative PCA scatter plots of embeddings (frozen vs fine-tuned) are available in [`notebooks/04_cv_pipeline.ipynb`](notebooks/04_cv_pipeline.ipynb) — clusters show improved UP/DOWN separability after domain adaptation.
