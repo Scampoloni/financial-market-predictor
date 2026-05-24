@@ -26,6 +26,7 @@ ENV/
 
 # Data (raw data not tracked — too large)
 data/raw/
+data/cache/
 
 # Model artifacts — committed directly (all files <50 MB)
 # models/*.pkl
