@@ -331,8 +331,9 @@ Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlappin
 - **Main user flow:**
   1. User selects a ticker and date range on the **Prediction** page.
   2. App loads pre-computed artifacts — `models/stacking_final.pkl` (contains the best-performing model, LightGBM in all configs, plus its feature column list; the filename is kept for backwards compatibility), `data/processed/features_market.parquet`, `data/processed/features_nlp.parquet`, and `data/processed/features_cv.parquet` — and returns a directional UP/DOWN probability with a Plotly candlestick chart. Live inference assembles features on-the-fly using `src/models/predict.py`; no `features_combined.parquet` is required.
-  3. User can explore per-block evidence on the **Analysis** page (tree feature importance / MDI, ablation bar chart).
-  4. User can query the **News Chat** tab (RAG chatbot) for contextual news evidence behind any prediction.
+  3. User can explore per-block evidence on the **Analysis** page: ablation bar chart, MDI tree feature importance, and **SHAP values** (TreeExplainer on LightGBM, 200 held-out test rows) — beeswarm summary plot + block-level attribution breakdown.
+  4. User can explore the training dataset on the **EDA** page: class balance, ticker price history, sector breakdown, FinBERT sentiment distribution, news volume by ticker, and CV PCA embedding scatter.
+  5. User can query the **News Chat** tab (RAG chatbot) for contextual news evidence behind any prediction.
 - **Screenshot or short demo:** See [`docs/screenshots/01_prediction_flow.png`](docs/screenshots/01_prediction_flow.png), [`docs/screenshots/02_model_analysis.png`](docs/screenshots/02_model_analysis.png), [`docs/screenshots/03_nlp_cv_integration.png`](docs/screenshots/03_nlp_cv_integration.png).
 
 App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pages/).
@@ -400,7 +401,7 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
 
 - [x] Third selected block implemented with strong quality — Computer Vision (EfficientNet-B0, domain fine-tuning, bi-daily chart generation, PCA compression, full ablation measurement).
 - [x] More than two data sources used with clear added value — Yahoo Finance OHLCV, RSS feeds + yfinance news API, ProsusAI/FinBERT (HuggingFace), EfficientNet-B0 (torchvision) with fine-tuning on domain data.
-- [x] Extended evaluation — Bootstrap 95 % CI (N = 2,000), 5-fold TimeSeriesSplit, per-class precision/recall/F1, multi-horizon comparison (5-day vs 21-day), per-class shift analysis (DOWN/UP recall trade-off across configs), statistical significance of ablation deltas. See [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
+- [x] Extended evaluation — Bootstrap 95 % CI (N = 2,000), 5-fold TimeSeriesSplit, per-class precision/recall/F1, multi-horizon comparison (5-day vs 21-day), per-class shift analysis (DOWN/UP recall trade-off across configs), statistical significance of ablation deltas, **SHAP TreeExplainer** (200 held-out test rows, beeswarm + block-level attribution). See [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
 - [x] Ethics, bias, or fairness analysis — See dedicated Section 6 below.
 - [x] Comprehensive test suite — 76 pytest tests covering feature parquet contracts (column names, value ranges, binary flags), ablation result validity (including Config D), 21-day model bundle contracts, VADER and FinBERT pipeline output format, CV PCA dimension and variance checks, temporal split non-overlap, and model artifact integrity. All tests run without network access or GPU. See [`tests/`](tests/).
 

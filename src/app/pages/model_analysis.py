@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import pickle
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from src.app.utils import load_ablation_results
-from src.config import TARGET_CLASSES, CV_FOLDS, STACKING_MODEL_PATH
+from src.config import TARGET_CLASSES, CV_FOLDS, STACKING_MODEL_PATH, TEST_START
 
 _MUTED = "#64748b"
 _CFG_NAMES = {
@@ -58,6 +62,45 @@ def _load_importances() -> pd.Series | None:
                 if hasattr(est, "feature_importances_"):
                     return pd.Series(est.feature_importances_, index=feat_cols)
         return None
+    except Exception:
+        return None
+
+
+@st.cache_data(show_spinner=False)
+def _load_shap_data() -> tuple[np.ndarray, pd.DataFrame, list[str]] | None:
+    """Compute SHAP values for 200 held-out test rows. Cached after first call."""
+    try:
+        import shap as _shap
+        from src.models.train_ml import load_combined_features
+
+        with open(STACKING_MODEL_PATH, "rb") as f:
+            bundle = pickle.load(f)
+        feat_cols = bundle["feature_cols"]
+        model = bundle["model"]
+
+        combined = load_combined_features("D")
+        if "sector" in combined.columns:
+            combined = pd.get_dummies(
+                combined, columns=["sector"], prefix="sector", drop_first=False
+            )
+
+        test = combined[combined.index >= TEST_START]
+        for col in feat_cols:
+            if col not in test.columns:
+                test = test.copy()
+                test[col] = 0.0
+
+        X_test = test[feat_cols].fillna(0)
+        rng = np.random.default_rng(42)
+        idx = rng.choice(len(X_test), size=min(200, len(X_test)), replace=False)
+        X_sample = X_test.iloc[idx].reset_index(drop=True)
+
+        explainer = _shap.TreeExplainer(model)
+        sv = explainer.shap_values(X_sample)
+        # LightGBM binary: shap_values is already (n, p) for the positive class
+        if isinstance(sv, list):
+            sv = sv[1]
+        return np.array(sv), X_sample, feat_cols
     except Exception:
         return None
 
@@ -243,6 +286,107 @@ def render() -> None:
         )
     else:
         st.info("Feature importances not available -- model file not found.")
+
+    # ── 3b. SHAP VALUES (TreeExplainer on LightGBM) ──────────────────────────
+    st.markdown("<h3 style='margin-top:1.5rem'>SHAP Feature Importance</h3>",
+                unsafe_allow_html=True)
+    st.markdown(
+        '<p style="color:#64748b;font-size:0.85rem;margin-bottom:0.8rem">'
+        'SHAP (SHapley Additive exPlanations) measures each feature\'s <em>marginal contribution</em> '
+        'to individual predictions — more reliable than MDI for correlated features. '
+        'Computed via TreeExplainer on 200 held-out 2025 test rows.</p>',
+        unsafe_allow_html=True,
+    )
+
+    shap_data = _load_shap_data()
+    if shap_data is not None:
+        sv, X_sample, feat_cols_shap = shap_data
+
+        # ── Mean |SHAP| bar chart by feature (top 15) ────────────────────────
+        mean_abs = pd.Series(np.abs(sv).mean(axis=0), index=feat_cols_shap)
+        top15 = mean_abs.sort_values(ascending=True).tail(15)
+        fi_colors_shap = [_block_color(f) for f in top15.index]
+
+        fig_shap_bar = go.Figure(go.Bar(
+            y=top15.index.tolist(),
+            x=top15.values,
+            orientation="h",
+            marker_color=fi_colors_shap,
+            text=[f"{v:.4f}" for v in top15.values],
+            textposition="outside",
+            textfont=dict(size=11, color="#94a3b8"),
+        ))
+        fig_shap_bar.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            height=440, margin=dict(l=10, r=70, t=10, b=20),
+            xaxis=dict(gridcolor="#1e293b", zeroline=False,
+                       title="Mean |SHAP value|"),
+            yaxis=dict(gridcolor="#1e293b", tickfont=dict(size=11, color="#e2e8f0")),
+            font=dict(family="Inter, sans-serif", size=12),
+            bargap=0.3,
+        )
+        st.plotly_chart(fig_shap_bar, use_container_width=True,
+                        config={"displayModeBar": False})
+
+        # ── SHAP beeswarm summary plot ────────────────────────────────────────
+        st.markdown(
+            '<p style="color:#64748b;font-size:0.85rem;margin:0.4rem 0 0.6rem">'
+            'Beeswarm: each dot = one prediction; colour = feature value (red = high, blue = low). '
+            'Horizontal position = SHAP impact on model output.</p>',
+            unsafe_allow_html=True,
+        )
+        try:
+            import shap as _shap
+            fig_bees, ax_bees = plt.subplots(figsize=(9, 6))
+            plt.sca(ax_bees)
+            _shap.summary_plot(
+                sv, X_sample,
+                feature_names=feat_cols_shap,
+                max_display=15,
+                show=False,
+                plot_size=None,
+            )
+            fig_bees.patch.set_facecolor("#0a0e17")
+            ax_bees.set_facecolor("#0f172a")
+            ax_bees.tick_params(colors="#94a3b8")
+            ax_bees.xaxis.label.set_color("#94a3b8")
+            for spine in ax_bees.spines.values():
+                spine.set_edgecolor("#1e293b")
+            fig_bees.tight_layout()
+            st.pyplot(fig_bees, use_container_width=True)
+            plt.close(fig_bees)
+        except Exception as exc:
+            st.info(f"Beeswarm plot unavailable: {exc}")
+
+        # ── Block-level SHAP breakdown ────────────────────────────────────────
+        nlp_keys = ("finbert", "vader", "news", "headline", "sentiment")
+        cv_keys = ("chart",)
+        total_shap = mean_abs.sum()
+        nlp_s = mean_abs[[c for c in mean_abs.index if any(k in c for k in nlp_keys)]].sum()
+        cv_s = mean_abs[[c for c in mean_abs.index if any(k in c for k in cv_keys)]].sum()
+        analyst_s = mean_abs[[c for c in mean_abs.index if c.startswith("analyst_") or c == "price_target_upside"]].sum()
+        mkt_s = total_shap - nlp_s - cv_s - analyst_s
+
+        st.markdown(
+            f'<div class="glass-card" style="display:flex;gap:16px;flex-wrap:wrap;'
+            f'justify-content:center;text-align:center;padding:16px">'
+            f'<div style="flex:1;min-width:100px">'
+            f'<div style="color:#4a90d9;font-size:1.5rem;font-weight:800">{mkt_s/total_shap:.1%}</div>'
+            f'<div style="color:#64748b;font-size:0.82rem">Market</div></div>'
+            f'<div style="flex:1;min-width:100px">'
+            f'<div style="color:#8b5cf6;font-size:1.5rem;font-weight:800">{nlp_s/total_shap:.1%}</div>'
+            f'<div style="color:#64748b;font-size:0.82rem">NLP</div></div>'
+            f'<div style="flex:1;min-width:100px">'
+            f'<div style="color:#f97316;font-size:1.5rem;font-weight:800">{cv_s/total_shap:.1%}</div>'
+            f'<div style="color:#64748b;font-size:0.82rem">CV</div></div>'
+            f'<div style="flex:1;min-width:100px">'
+            f'<div style="color:#f59e0b;font-size:1.5rem;font-weight:800">{analyst_s/total_shap:.1%}</div>'
+            f'<div style="color:#64748b;font-size:0.82rem">Analyst</div></div></div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info("SHAP values unavailable -- model artifact or feature files not found.")
 
     # ── 4. MODEL COMPARISON TABLE ────────────────────────────────────────────
     st.markdown("<h3 style='margin-top:1.5rem'>Model Comparison (Config C)</h3>", unsafe_allow_html=True)
