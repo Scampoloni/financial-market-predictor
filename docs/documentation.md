@@ -79,7 +79,7 @@ Data collection: [`src/data_collection/market_collector.py`](https://github.com/
 
 See *Feature Engineering* in [`notebooks/02_ml_baseline.ipynb`](notebooks/02_ml_baseline.ipynb).
 
-**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, the SIDEWAYS class is eliminated: all observations are reclassified as binary UP (5-day return > 0 %) / DOWN (return ≤ 0 %). No rows are dropped — the ±1 % zone (~23 % of data) is redistributed into UP/DOWN by sign rather than filtered out. This simplification raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py` L273–294](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/features/market_features.py#L273-L294) for the target construction logic.
+**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, the SIDEWAYS class is eliminated: all observations are reclassified as binary UP (5-day return > 0 %) / DOWN (return ≤ 0 %). No rows are dropped — the ±1 % zone (~23 % of data) is redistributed into UP/DOWN by sign rather than filtered out. This simplification raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py` L270–291](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/features/market_features.py#L270-L291) for the target construction logic.
 
 #### EDA Key Findings
 

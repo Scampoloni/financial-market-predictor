@@ -62,10 +62,8 @@ FEATURES_ANALYST_PATH = PROCESSED_DIR / "features_analyst.parquet"
 TICKERS_CSV_PATH = METADATA_DIR / "tickers.csv"
 
 # Model artifacts
-XGBOOST_MODEL_PATH = MODELS_DIR / "xgboost_final.pkl"
 STACKING_MODEL_PATH = MODELS_DIR / "stacking_final.pkl"
 MODEL_21D_PATH = MODELS_DIR / "model_21d.pkl"
-SCALER_PATH = MODELS_DIR / "scaler.pkl"
 PCA_NLP_PATH = PROCESSED_DIR / "pca_nlp_embeddings.pkl"   # written by nlp_features.py
 PCA_CV_PATH = MODELS_DIR / "pca_cv.pkl"
 CHART_CNN_PATH = MODELS_DIR / "cnn_finetuned.pth"   # fine-tuned EfficientNet-B0 weights
