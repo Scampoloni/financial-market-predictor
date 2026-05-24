@@ -14,6 +14,7 @@ shap>=0.42.0
 plotly>=5.17.0
 streamlit>=1.28.0
 pytest>=7.4.0
+pytest-cov>=4.0.0
 ruff>=0.4.0
 python-dotenv>=1.0.0
 feedparser>=6.0.0
