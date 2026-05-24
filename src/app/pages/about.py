@@ -160,7 +160,7 @@ def render() -> None:
         ("VIX Level", "CBOE fear gauge. >25 = fear; <18 = complacency."),
         ("Return 1D / 5D / 20D", "Price return over 1-, 5-, and 20-day horizons."),
         ("Price/SMA20 & Price/SMA50", "Distance of price from 20- and 50-day moving averages."),
-        ("Sector Dummies", "One-hot encoding of the GICS sector (11 total)."),
+        ("Sector Dummies", "One-hot encoding of 7 sectors (Tech, Finance, Insurance, Healthcare, Consumer, Energy, Industrial)."),
     ]
     _NLP_FEATURES = [
         ("FinBERT Sentiment", "Finance-domain BERT (ProsusAI/finbert). Score: -1 (negative) to +1 (positive)."),
