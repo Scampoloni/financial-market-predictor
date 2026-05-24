@@ -1,0 +1,19 @@
+{
+  "n_samples": 11993,
+  "accuracy": 0.5147,
+  "f1_macro": 0.5057,
+  "f1_down": 0.439,
+  "f1_up": 0.5724,
+  "confusion_matrix": [
+    [
+      2277,
+      3143
+    ],
+    [
+      2677,
+      3896
+    ]
+  ],
+  "date_cutoff": "2025-01-01",
+  "note": "Evaluated on charts unseen during training and epoch selection. Training: dates <= 2023-12-31. Val (epoch selection): 2024-01-01 \u2013 2024-06-30. This set: >= 2025-01-01."
+}
