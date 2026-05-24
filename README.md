@@ -82,7 +82,7 @@ Evidence: `data/processed/ablation_results.json` records `selection_metric: "val
 ```
 DATA COLLECTION
 ├── Yahoo Finance → OHLCV (69 CSV files, 67 tickers + 2 indices)
-├── RSS / NewsAPI  → Financial headlines (8,552 rows across 67 tickers)
+├── RSS / yfinance news API → Financial headlines (~6,100 rows across 67 tickers)
 └── mplfinance    → Candlestick chart images (61,640+ PNGs, bi-daily)
 
 FEATURE EXTRACTION
@@ -92,8 +92,9 @@ FEATURE EXTRACTION
 
 UNIFIED FEATURE MATRIX (per ticker-date)
 ├── Config A: 28 features  (market only)
-├── Config B: 56 features  (+ NLP)
-└── Config C: 66 features  (+ CV)      ← full multimodal configuration
+├── Config B: 56 features  (+ NLP + analyst)
+├── Config C: 66 features  (+ CV)
+└── Config D: 66 features  (corrected analyst pipeline) ← deployed configuration
 
 MODEL TRAINING (identical split across all configs)
 ├── RandomForest       (fixed hyperparameters, TimeSeriesSplit CV)
@@ -181,7 +182,7 @@ FinBERT compound score + confidence, VADER compound score, news volume (1d/5d ro
 | Source | Type | Scale |
 |--------|------|-------|
 | **Yahoo Finance** (yfinance) | OHLCV + VIX | 67 tickers + 2 indices, 2020–2026 |
-| **RSS feeds + NewsAPI** | Reuters, MarketWatch, Yahoo Finance headlines | 8,552 scraped rows across 67 tickers |
+| **RSS feeds + yfinance news API** | Reuters, MarketWatch, Yahoo Finance headlines | ~6,100 scraped rows across 67 tickers |
 | **ProsusAI/finbert** | Pre-trained financial sentiment model | HuggingFace Hub |
 | **EfficientNet-B0** | CNN backbone (torchvision) → domain fine-tuned | 61,640 generated chart images |
 

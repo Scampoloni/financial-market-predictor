@@ -86,6 +86,9 @@ def render() -> None:
 
     table_rows = ""
     for cfg in ["A", "B", "C", "D"]:
+        # Skip any config not yet computed
+        if cfg not in results:
+            continue
         r = results[cfg]
         f1 = r["test_f1_macro"]
         acc = r["test_accuracy"]
@@ -97,9 +100,6 @@ def render() -> None:
             delta_html = f'<span style="color:#10b981;font-weight:700">+{delta:.4f}</span>'
         else:
             delta_html = f'<span style="color:#ef4444;font-weight:700">{delta:+.4f}</span>'
-        # Skip Config D row if not yet computed
-        if cfg == "D" and cfg not in results:
-            continue
 
         best = r.get("best_model", "--")
         color = _CFG_COLORS[cfg]
@@ -391,7 +391,7 @@ def render() -> None:
         f'that financial news sentiment captures information not fully reflected in '
         f'technical indicators. The small effect size is expected: most trading days '
         f'rely on sector-level sentiment fallback due to sparse per-ticker news coverage '
-        f'(only 0.3% of ticker-days have direct headlines).</p>'
+        f'(only ~1.5% of ticker-days have direct headlines).</p>'
 
         f'<p><b style="color:#f97316">CV contribution ({cv_delta:+.4f} F1):</b> '
         f'Adding EfficientNet-B0 chart embeddings shows a marginal '

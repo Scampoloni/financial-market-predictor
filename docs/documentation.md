@@ -166,14 +166,14 @@ Ablation results stored in [`data/processed/ablation_results.json`](data/process
 
 | Entry | Source name or link | Type | Size | Role in this block |
 | --- | --- | --- | --- | --- |
-| 1 | RSS financial news feeds (Yahoo Finance, Reuters, CNBC, Seeking Alpha) | Unstructured text (headlines) | ~6,200 headlines across 67 tickers | Primary sentiment signal |
-| 2 | [NewsAPI](https://newsapi.org) | Unstructured text (headlines + snippets) | ~2,350 additional headlines | Supplementary coverage for low-news tickers |
+| 1 | RSS financial news feeds (Yahoo Finance, Reuters, CNBC, Seeking Alpha) + yfinance per-ticker news API | Unstructured text (headlines) | ~6,100 headline-rows across 67 tickers | Primary sentiment signal |
+| 2 | [NewsAPI](https://newsapi.org) | Unstructured text (headlines + snippets) | Not collected in this run (requires `NEWS_API_KEY` in .env) | Supplementary coverage for low-news tickers |
 | 3 | [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert) (HuggingFace) | Pre-trained transformer model | ~440 MB | Sentiment scoring model |
 | 4 | [Yahoo Finance via yfinance](https://finance.yahoo.com) — `ticker.upgrades_downgrades` + `ticker.recommendations` | Analyst rating time series (structured) | 67 tickers × ~1,508 dates; historical firm-level upgrades/downgrades + monthly consensus counts | 5 analyst features: `analyst_consensus`, `analyst_upgrade_score`, `analyst_coverage_count`, `price_target_upside`, `analyst_sentiment_momentum` |
 
 News collection: [`src/data_collection/news_scraper.py`](src/data_collection/news_scraper.py).  
 Analyst feature builder: [`src/data_collection/build_analyst_features.py`](src/data_collection/build_analyst_features.py).  
-Total corpus: ~8,550 headline-rows stored in `data/raw/news/`.
+Total corpus: ~6,100 headline-rows stored in `data/raw/news/` (67 per-ticker `.parquet` files; NewsAPI was not enabled in this run).
 
 #### 2B.2 Preprocessing and Prompt Design
 
@@ -198,7 +198,7 @@ Total corpus: ~8,550 headline-rows stored in `data/raw/news/`.
 #### 2B.3 Approach Selection
 
 - **Approach used:** Dual-model sentiment scoring (FinBERT transformer + VADER lexicon) combined with PCA-compressed FinBERT embeddings; RAG chatbot as supplementary NLP feature.
-- **Alternatives considered:** Classical TF-IDF + logistic regression (rejected: no contextual understanding); GPT-4 scoring (rejected: cost and rate limits at 8,552 headlines); single-model VADER-only (rejected: misses domain-specific financial language).
+- **Alternatives considered:** Classical TF-IDF + logistic regression (rejected: no contextual understanding); GPT-4 scoring (rejected: cost and rate limits at ~6,100 headlines); single-model VADER-only (rejected: misses domain-specific financial language).
 
 See *Approach Selection* in [`notebooks/03_nlp_pipeline.ipynb`](notebooks/03_nlp_pipeline.ipynb#approach-selection).
 
