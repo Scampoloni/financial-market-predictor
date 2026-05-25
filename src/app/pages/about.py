@@ -61,7 +61,7 @@ def render() -> None:
             '<span style="color:#475569">Sentiment score, momentum, surprise, dispersion, '
             'news volume z-score, sector fallback. '
             'RAG chatbot for interactive Q&amp;A.</span><br><br>'
-            '<span style="color:#475569;font-size:0.8rem">Source: RSS feeds + yfinance news</span>'
+            '<span style="color:#475569;font-size:0.8rem">Source: RSS feeds (+ optional NewsAPI)</span>'
             '</div></div>',
             unsafe_allow_html=True,
         )
@@ -87,7 +87,7 @@ def render() -> None:
 
     rows = [
         ("#10b981", "Yahoo Finance",    "6yr daily OHLCV for 67 S&P 500 tickers (2020–2026), ~101k rows"),
-        ("#f59e0b", "Financial News",   "RSS feeds (Reuters, MarketWatch) + yfinance news API, ~6,100 headlines"),
+        ("#f59e0b", "Financial News",   "RSS feeds (Reuters, MarketWatch, Yahoo Finance) + optional NewsAPI, ~6,100 headlines"),
         ("#60a5fa", "Candlestick Charts","61,640+ images generated via mplfinance (30-day windows, step=2)"),
         ("#8b5cf6", "Pre-trained Models","ProsusAI/finbert (HuggingFace) · EfficientNet-B0 (torchvision ImageNet)"),
     ]

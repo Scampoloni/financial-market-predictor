@@ -166,7 +166,7 @@ Ablation results stored in [`data/processed/ablation_results.json`](data/process
 
 | Entry | Source name or link | Type | Size | Role in this block |
 | --- | --- | --- | --- | --- |
-| 1 | RSS financial news feeds (Yahoo Finance, Reuters, CNBC, Seeking Alpha) + yfinance per-ticker news API | Unstructured text (headlines) | ~6,100 headline-rows across 67 tickers | Primary sentiment signal |
+| 1 | RSS financial news feeds (Yahoo Finance, Reuters, MarketWatch) + optional NewsAPI supplementation | Unstructured text (headlines) | ~6,100 headline-rows across 67 tickers | Primary sentiment signal |
 | 2 | [NewsAPI](https://newsapi.org) | Unstructured text (headlines + snippets) | Not collected in this run (requires `NEWS_API_KEY` in .env) | Supplementary coverage for low-news tickers |
 | 3 | [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert) (HuggingFace) | Pre-trained transformer model | ~440 MB | Sentiment scoring model |
 | 4 | [Yahoo Finance via yfinance](https://finance.yahoo.com) — `ticker.upgrades_downgrades` + `ticker.recommendations` | Analyst rating time series (structured) | 67 tickers × ~1,508 dates; historical firm-level upgrades/downgrades + monthly consensus counts | 5 analyst features: `analyst_consensus`, `analyst_upgrade_score`, `analyst_coverage_count`, `price_target_upside`, `analyst_sentiment_momentum` |
@@ -177,7 +177,7 @@ Total corpus: ~6,100 headline-rows stored in `data/raw/news/` (67 per-ticker `.p
 
 #### 2B.2 Preprocessing and Prompt Design
 
-- **Text preprocessing:** Lower-case normalisation; removal of boilerplate ticker mentions; deduplication by headline hash; 512-token truncation for FinBERT. See [`src/nlp/finbert_sentiment.py`](src/nlp/finbert_sentiment.py).
+- **Text preprocessing:** Per-ticker headline matching, fuzzy near-duplicate removal via RapidFuzz, daily aggregation by publication date, and 512-token truncation for FinBERT. The production pipeline does not apply an extra handcrafted lower-casing or ticker-token stripping stage before scoring. See [`src/data_collection/news_scraper.py`](src/data_collection/news_scraper.py) and [`src/nlp/finbert_sentiment.py`](src/nlp/finbert_sentiment.py).
 - **Prompt design or retrieval setup:** No generative prompting for the sentiment pipeline. For the RAG chatbot ([`src/nlp/rag_chatbot.py`](src/nlp/rag_chatbot.py)): headlines are chunked and embedded with `sentence-transformers/all-MiniLM-L6-v2`; top-5 retrieved chunks are prepended to a Claude API call. Coverage fallback hierarchy: ticker-level → sector-average → market-average → forward-fill.
 
   **NLP sentiment coverage by fallback tier** (out of 101,036 total ticker-day rows):
@@ -192,7 +192,7 @@ Total corpus: ~6,100 headline-rows stored in `data/raw/news/` (67 per-ticker `.p
 
   Rows that rely on tier 2–4 are flagged by `is_sentiment_imputed = 1` in the NLP feature matrix. The net effect: Config B achieves complete row coverage but with a weak, aggregated signal for the majority of observations — the primary reason NLP adds noise rather than predictive lift (−0.0143 F1 vs Config A).
 
-- **Analyst data (5 additional features):** `analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside` — structured signals derived from analyst rating data, persisted separately in [`data/processed/features_analyst.parquet`](data/processed/features_analyst.parquet) and joined to the NLP feature matrix at training time. Together with the 23 text-derived features this yields 28 NLP-block features total.
+- **Analyst data (5 additional features):** `analyst_consensus`, `analyst_coverage_count`, `analyst_sentiment_momentum`, `analyst_upgrade_score`, `price_target_upside` — structured signals derived from analyst rating data, persisted separately in [`data/processed/features_analyst.parquet`](data/processed/features_analyst.parquet) and joined to the NLP feature matrix at training time. In the committed batch artifact, `price_target_upside` is kept as a neutral placeholder because reliable point-in-time historical price-target series are not available through the same endpoint. Together with the 23 text-derived features this yields 28 NLP-block features total.
 - **PCA note:** FinBERT embedding PCA (10 components) is fitted on training-period rows only (date ≤ 2024-06-30); val/test rows are transformed using the saved scaler/PCA without re-fitting ([`src/features/nlp_features.py`](src/features/nlp_features.py)). This eliminates any temporal leakage from test-period embedding distributions.
 
 #### 2B.3 Approach Selection
@@ -251,7 +251,7 @@ Fine-tuning script: [`scripts/finetune_cnn.py`](https://github.com/Scampoloni/fi
 #### 2C.2 Preprocessing and Augmentation
 
 - **Image preprocessing:** 30-day OHLCV window rendered as a dark-background candlestick PNG (224×224 px) using mplfinance. Images are normalised with ImageNet mean/std before EfficientNet inference. See [`src/cv/chart_classifier.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/cv/chart_classifier.py).
-- **Augmentation strategy:** No data augmentation during inference. During CNN fine-tuning (`scripts/finetune_cnn.py`): random horizontal flip, colour jitter (brightness/contrast ±0.2), random rotation ±5°. Augmentation is conservative to preserve chart semantics.
+- **Augmentation strategy:** No data augmentation during inference. During CNN fine-tuning (`scripts/finetune_cnn.py`): random horizontal flip (`p=0.3`) and mild colour jitter (`brightness=0.1`, `contrast=0.1`). Augmentation is conservative to preserve chart semantics.
 - **PCA note:** EfficientNet embedding PCA (10 components) is fitted on training-period rows only (date ≤ 2024-06-30); val/test rows are transformed using the saved scaler/PCA without re-fitting ([`src/features/cv_features.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/features/cv_features.py)). This eliminates any temporal leakage from test-period embedding distributions.
 
 #### 2C.3 Model Selection
@@ -330,7 +330,7 @@ Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlappin
 - **Deployment URL:** https://financial-market-predictorr.streamlit.app/
 - **Main user flow:**
   1. User selects a ticker and date range on the **Prediction** page.
-  2. App loads pre-computed artifacts — `models/stacking_final.pkl` (contains the best-performing model, LightGBM in all configs, plus its feature column list; the filename is kept for backwards compatibility), `data/processed/features_market.parquet`, `data/processed/features_nlp.parquet`, and `data/processed/features_cv.parquet` — and returns a directional UP/DOWN probability with a Plotly candlestick chart. Live inference assembles features on-the-fly using `src/models/predict.py`; no `features_combined.parquet` is required.
+  2. App loads pre-computed artifacts — `models/stacking_final.pkl` (the deployed **Config D** 5-day LightGBM bundle), `data/processed/features_market.parquet`, `data/processed/features_nlp.parquet`, and `data/processed/features_cv.parquet` — and returns a directional UP/DOWN probability with a Plotly candlestick chart. Live inference assembles features on-the-fly using `src/models/predict.py`; no `features_combined.parquet` is required.
   3. User can explore per-block evidence on the **Analysis** page: ablation bar chart, MDI tree feature importance, and **SHAP values** (TreeExplainer on LightGBM, 200 held-out test rows) — beeswarm summary plot + block-level attribution breakdown.
   4. User can explore the training dataset on the **EDA** page: class balance, ticker price history, sector breakdown, FinBERT sentiment distribution, news volume by ticker, and CV PCA embedding scatter.
   5. User can query the **News Chat** tab (RAG chatbot) for contextual news evidence behind any prediction.
@@ -393,14 +393,14 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
   ```
   Expected output: `ALL CHECKS PASSED — results match documentation.`
 
-- **Reproducibility notes:** Python 3.10+. All random seeds fixed via [`src/config.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/config.py). Pre-computed artifacts are committed to the repository (`models/`, `data/processed/`) so the app can be launched without re-running the full pipeline. For byte-exact reproducibility use `requirements-pinned.txt`.
+- **Reproducibility notes:** Python 3.10+. Random states are fixed in the ML/PCA training code (`random_state=42`) and the CNN fine-tuning script sets `random.seed(42)`, `numpy.random.seed(42)`, and `torch.manual_seed(42)`. Pre-computed artifacts are committed to the repository (`models/`, `data/processed/`) so the app can be launched without re-running the full pipeline. For byte-exact reproducibility use `requirements-pinned.txt`.
 
 ---
 
 ## 5. Optional Bonus Evidence
 
 - [x] Third selected block implemented with strong quality — Computer Vision (EfficientNet-B0, domain fine-tuning, bi-daily chart generation, PCA compression, full ablation measurement).
-- [x] More than two data sources used with clear added value — Yahoo Finance OHLCV, RSS feeds + yfinance news API, ProsusAI/FinBERT (HuggingFace), EfficientNet-B0 (torchvision) with fine-tuning on domain data.
+- [x] More than two data sources used with clear added value — Yahoo Finance OHLCV, RSS feeds (+ optional NewsAPI supplementation), ProsusAI/FinBERT (HuggingFace), EfficientNet-B0 (torchvision) with fine-tuning on domain data.
 - [x] Extended evaluation — Bootstrap 95 % CI (N = 2,000), 5-fold TimeSeriesSplit, per-class precision/recall/F1, multi-horizon comparison (5-day vs 21-day), per-class shift analysis (DOWN/UP recall trade-off across configs), statistical significance of ablation deltas, **SHAP TreeExplainer** (200 held-out test rows, beeswarm + block-level attribution). See [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
 - [x] Ethics, bias, or fairness analysis — See dedicated Section 6 below.
 - [x] Comprehensive test suite — 76 pytest tests covering feature parquet contracts (column names, value ranges, binary flags), ablation result validity (including Config D), 21-day model bundle contracts, VADER and FinBERT pipeline output format, CV PCA dimension and variance checks, temporal split non-overlap, and model artifact integrity. All tests run without network access or GPU. See [`tests/`](tests/).
@@ -416,7 +416,7 @@ Evidence for selected bonus items: full ablation results in [`data/processed/abl
 ### 6.1 Data Bias
 
 - **Survivorship bias:** The ticker universe consists of 67 currently-listed S&P 500 large-caps. Companies that were delisted, went bankrupt, or were removed from the index between 2020 and 2026 are absent. This biases the training distribution toward historically successful firms and may overstate UP prediction reliability — fallen stocks, which would produce DOWN labels, are invisible to the model.
-- **English-language concentration:** All news inputs come from English-language RSS feeds and yfinance news API, dominated by US financial media (Reuters, MarketWatch, Yahoo Finance). Non-English coverage of the same companies — particularly relevant for companies with significant European or Asian operations — is invisible to the NLP block, which may distort sentiment for multinational firms.
+- **English-language concentration:** All news inputs come from English-language RSS feeds and optional NewsAPI supplementation, dominated by US financial media (Reuters, MarketWatch, Yahoo Finance). Non-English coverage of the same companies — particularly relevant for companies with significant European or Asian operations — is invisible to the NLP block, which may distort sentiment for multinational firms.
 - **Source concentration:** A small number of high-volume news feeds account for most headlines. Sentiment driven by niche, regional, or specialised outlets is under-represented. A story breaking first in a domain-specific publication may not reach the model's pipeline in time to predict the associated price move.
 - **Temporal distribution shift:** The model is trained on 2020–2024 data that includes the COVID-19 crash, post-pandemic recovery, and aggressive Fed rate cycles — exceptional macro regimes. Performance on future data under different macro conditions (e.g. prolonged low-volatility, deflationary environments) is not guaranteed.
 

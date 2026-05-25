@@ -94,7 +94,7 @@ TARGET_HORIZON_DAYS_LONG = 21   # predict 21-trading-day (~1 month) forward retu
 TARGET_CLASSES = ["DOWN", "UP"]  # binary: return <= 0 → DOWN, > 0 → UP
 
 # ---------------------------------------------------------------------------
-# Ticker universe — ~80 S&P 500 tickers across sectors
+# Ticker universe — 67 S&P 500 tickers across sectors
 # ---------------------------------------------------------------------------
 TICKERS_TECH = [
     "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA",

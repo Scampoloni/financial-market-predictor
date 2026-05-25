@@ -82,7 +82,7 @@ Evidence: `data/processed/ablation_results.json` records `selection_metric: "val
 ```
 DATA COLLECTION
 ├── Yahoo Finance → OHLCV (69 CSV files, 67 tickers + 2 indices)
-├── RSS / yfinance news API → Financial headlines (~6,100 rows across 67 tickers)
+├── RSS feeds (+ optional NewsAPI) → Financial headlines (~6,100 rows across 67 tickers)
 └── mplfinance    → Candlestick chart images (61,640+ PNGs, bi-daily)
 
 FEATURE EXTRACTION
@@ -182,7 +182,7 @@ FinBERT compound score + confidence, VADER compound score, news volume (1d/5d ro
 | Source | Type | Scale |
 |--------|------|-------|
 | **Yahoo Finance** (yfinance) | OHLCV + VIX | 67 tickers + 2 indices, 2020–2026 |
-| **RSS feeds + yfinance news API** | Reuters, MarketWatch, Yahoo Finance headlines | ~6,100 scraped rows across 67 tickers |
+| **RSS feeds (+ optional NewsAPI)** | Reuters, MarketWatch, Yahoo Finance headlines | ~6,100 scraped rows across 67 tickers |
 | **ProsusAI/finbert** | Pre-trained financial sentiment model | HuggingFace Hub |
 | **EfficientNet-B0** | CNN backbone (torchvision) → domain fine-tuned | 61,640 generated chart images |
 
@@ -302,11 +302,13 @@ It covers **3 tickers (AAPL, MSFT, NVDA) + 2 indices**, ~3 months of market data
 corpus of news headlines — enough to exercise the entire feature-to-training pipeline in minutes
 rather than hours.
 
-**What the smoke run produces** (writes to the same default paths as the full pipeline — the smoke dataset swap ensures only 3-ticker data is processed):
+**What the smoke run produces** (the smoke dataset swap ensures only 3-ticker data is processed):
 - `data/processed/features_market.parquet` — 28-feature market block for the 3 tickers
 - `data/processed/features_nlp.parquet` — NLP block (3 tickers)
 - `data/processed/features_cv.parquet` — 10 PCA CV embeddings (3 tickers)
-- `models/stacking_final.pkl` — a trained LightGBM Config C model (not production quality; restore full dataset to recover production artifacts)
+- `models/stacking_final_C.pkl` — a trained LightGBM Config C reference model for smoke validation
+
+The committed `models/stacking_final.pkl` remains the deployed full-run Config D artifact used by the app.
 
 ```bash
 # Only needed if data/smoke is missing locally:
