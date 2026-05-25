@@ -462,14 +462,14 @@ def run_ablation(configs: list[str] = ("A", "B", "C", "D")) -> dict:
         )
 
         # Save model artifacts.
-        # Config C: saved as stacking_final.pkl (backwards-compat name, used by live predictor).
-        # Config D: saved as stacking_final_D.pkl (corrected full model — do NOT overwrite C).
+        # Config C is kept as a reference artifact, while Config D becomes the
+        # deployed 5-day model that the app loads via STACKING_MODEL_PATH.
         if config in ("C", "D"):
             MODELS_DIR.mkdir(parents=True, exist_ok=True)
             if config == "C":
-                save_path = STACKING_MODEL_PATH
+                save_path = MODELS_DIR / "stacking_final_C.pkl"
             else:
-                save_path = MODELS_DIR / "stacking_final_D.pkl"
+                save_path = STACKING_MODEL_PATH
             with open(save_path, "wb") as f:
                 pickle.dump({
                     "model": best_model,
@@ -478,6 +478,17 @@ def run_ablation(configs: list[str] = ("A", "B", "C", "D")) -> dict:
                     "ablation_config": config,
                 }, f)
             logger.info("Config %s best model (%s) saved to %s", config, best_name, save_path)
+
+            if config == "D":
+                mirror_path = MODELS_DIR / "stacking_final_D.pkl"
+                with open(mirror_path, "wb") as f:
+                    pickle.dump({
+                        "model": best_model,
+                        "feature_cols": feature_cols,
+                        "best_model_type": best_name,
+                        "ablation_config": config,
+                    }, f)
+                logger.info("Config D mirror artifact saved to %s", mirror_path)
 
     # Save results (without _model objects)
     ABLATION_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)

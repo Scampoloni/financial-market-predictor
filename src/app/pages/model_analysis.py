@@ -49,7 +49,7 @@ def _block_color(feat: str) -> str:
 
 @st.cache_data(show_spinner=False)
 def _load_importances() -> pd.Series | None:
-    """Load feature importances from saved Config C model."""
+    """Load feature importances from the deployed 5-day model."""
     try:
         with open(STACKING_MODEL_PATH, "rb") as f:
             saved = pickle.load(f)
@@ -223,7 +223,7 @@ def render() -> None:
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
     # ── 3. FEATURE IMPORTANCE -- CONFIG C (Top 15) ───────────────────────────
-    st.markdown("<h3 style='margin-top:1.5rem'>Feature Importance -- Config C (Top 15)</h3>",
+    st.markdown("<h3 style='margin-top:1.5rem'>Feature Importance -- Deployed 5-Day Model (Top 15)</h3>",
                 unsafe_allow_html=True)
     st.markdown(
         '<p style="color:#64748b;font-size:0.85rem;margin-bottom:0.8rem">'
@@ -389,7 +389,7 @@ def render() -> None:
         st.info("SHAP values unavailable -- model artifact or feature files not found.")
 
     # ── 4. MODEL COMPARISON TABLE ────────────────────────────────────────────
-    st.markdown("<h3 style='margin-top:1.5rem'>Model Comparison (Config C)</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-top:1.5rem'>Model Comparison (All Configs)</h3>", unsafe_allow_html=True)
 
     if any("per_model" in r for r in results.values()):
         mc_rows = ""

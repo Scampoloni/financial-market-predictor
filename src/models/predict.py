@@ -225,9 +225,10 @@ class LivePredictor:
           1. Load pre-computed analyst parquet (fast, always works on cloud).
           2. Attempt live yfinance fetch for fresher data — if it succeeds,
              override the parquet values.
-          3. Optionally enrich with live price-target upside.
+
+        The deployed model was trained on batch-built analyst features, so we
+        keep the live feature vector aligned with those artifact semantics.
         """
-        import yfinance as yf
         from src.config import PROCESSED_DIR
         from src.data_collection.build_analyst_features import (
             build_analyst_features_for_ticker,
@@ -270,17 +271,6 @@ class LivePredictor:
                             result[col] = float(v)
         except Exception as exc:
             logger.debug("%s: live analyst fetch failed (%s) — using parquet data", ticker, exc)
-
-        # ── 3. Live price-target upside ─────────────────────────────────────
-        if current_price and current_price > 0:
-            try:
-                pt = yf.Ticker(ticker).analyst_price_targets
-                if isinstance(pt, dict):
-                    mean_t = float(pt.get("mean", 0) or 0)
-                    if mean_t > 0:
-                        result["price_target_upside"] = (mean_t - current_price) / current_price
-            except Exception:
-                pass
 
         return result
 
@@ -372,11 +362,19 @@ class LivePredictor:
         if analyst_feat is not None:
             parts.append(analyst_feat)
         all_feat = pd.concat(parts)
-        feature_vec = (
-            pd.DataFrame([all_feat])
-            .reindex(columns=feature_cols, fill_value=0)
-            .fillna(0)
-        )
+        feature_vec = pd.DataFrame([all_feat])
+
+        # Match training-time preprocessing exactly: sector is one-hot encoded
+        # before the final feature selection.
+        if "sector" in feature_vec.columns:
+            feature_vec = pd.get_dummies(
+                feature_vec,
+                columns=["sector"],
+                prefix="sector",
+                drop_first=False,
+            )
+
+        feature_vec = feature_vec.reindex(columns=feature_cols, fill_value=0).fillna(0)
 
         proba = model.predict_proba(feature_vec)[0]
         classes = model.classes_

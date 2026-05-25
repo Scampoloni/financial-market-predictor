@@ -33,6 +33,7 @@ EXPECTED = {
     "C": {"test_f1_macro": 0.4861, "test_accuracy": 0.4863, "n_features": 66},
     "D": {"test_f1_macro": 0.4850, "test_accuracy": 0.4850, "n_features": 66},
 }
+EXPECTED_TICKERS = 67
 TOLERANCE = 0.001  # ±0.001 F1 allowed for float rounding
 
 
@@ -68,25 +69,69 @@ def verify_ablation() -> bool:
 
 
 def verify_model_artifact() -> bool:
-    path = ROOT / "models" / "stacking_final_D.pkl"
-    if not path.exists():
-        # Try legacy filename
-        path = ROOT / "models" / "stacking_final.pkl"
-    if not path.exists():
-        print("\nERROR: No model artifact found in models/")
-        return False
+    candidates = [
+        ("deployed", ROOT / "models" / "stacking_final.pkl"),
+        ("config_d_mirror", ROOT / "models" / "stacking_final_D.pkl"),
+    ]
 
-    print(f"\n=== Model Artifact ({path.name}) ===")
-    with open(path, "rb") as f:
-        bundle = pickle.load(f)
+    print("\n=== Model Artifacts ===")
+    all_ok = True
 
-    n_feats = len(bundle.get("feature_cols", []))
-    model_type = bundle.get("best_model_type", "unknown")
-    print(f"  Model type   : {model_type}")
-    print(f"  Feature count: {n_feats}  (expected 66)")
-    ok = n_feats == 66
-    print(f"  {'OK' if ok else 'FAIL'}  feature count")
-    return ok
+    for label, path in candidates:
+        if not path.exists():
+            print(f"  FAIL  missing {label} artifact: {path.name}")
+            all_ok = False
+            continue
+
+        with open(path, "rb") as f:
+            bundle = pickle.load(f)
+
+        n_feats = len(bundle.get("feature_cols", []))
+        model_type = bundle.get("best_model_type", "unknown")
+        ablation_config = bundle.get("ablation_config", "unknown")
+        ok = n_feats == 66 and ablation_config == "D"
+        print(
+            f"  {'OK' if ok else 'FAIL'}  {label}: {path.name} | "
+            f"type={model_type} | config={ablation_config} | features={n_feats}"
+        )
+        all_ok = all_ok and ok
+
+    return all_ok
+
+
+def verify_feature_artifacts() -> bool:
+    import pandas as pd
+
+    processed = ROOT / "data" / "processed"
+    market_path = processed / "features_market.parquet"
+    nlp_path = processed / "features_nlp.parquet"
+    cv_path = processed / "features_cv.parquet"
+    analyst_path = processed / "features_analyst.parquet"
+
+    print("\n=== Feature Artifacts ===")
+    all_ok = True
+
+    for label, path in (
+        ("market", market_path),
+        ("nlp", nlp_path),
+        ("cv", cv_path),
+        ("analyst", analyst_path),
+    ):
+        if not path.exists():
+            print(f"  FAIL  missing {label} artifact: {path}")
+            all_ok = False
+            continue
+
+        df = pd.read_parquet(path)
+        n_tickers = int(df["ticker"].nunique()) if "ticker" in df.columns else -1
+        ok = n_tickers == EXPECTED_TICKERS
+        print(
+            f"  {'OK' if ok else 'FAIL'}  {label}: "
+            f"{len(df):,} rows | {n_tickers} tickers | {path.name}"
+        )
+        all_ok = all_ok and ok
+
+    return all_ok
 
 
 def verify_21d_model() -> bool:
@@ -120,10 +165,11 @@ def main() -> None:
 
     ok_ablation = verify_ablation()
     ok_model    = verify_model_artifact()
+    ok_features = verify_feature_artifacts()
     ok_21d      = verify_21d_model()
 
     print("\n" + "=" * 52)
-    if ok_ablation and ok_model and ok_21d:
+    if ok_ablation and ok_model and ok_features and ok_21d:
         print("ALL CHECKS PASSED — results match documentation.")
     else:
         print("SOME CHECKS FAILED — see above for details.")

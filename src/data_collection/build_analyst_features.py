@@ -9,7 +9,7 @@ Produces 5 daily features per ticker, forward-filled from actual rating dates:
   - analyst_consensus          : recency-weighted mean grade score (–2 to +2)
   - analyst_upgrade_score      : upgrades minus downgrades in last 30 days
   - analyst_coverage_count     : number of active analyst firms
-  - price_target_upside        : (mean_target – close) / close  (static current estimate)
+  - price_target_upside        : reserved placeholder (neutral in committed artifact)
   - analyst_sentiment_momentum : change in consensus over last 90 days
 
 Usage:
@@ -143,8 +143,8 @@ def build_analyst_features_for_ticker(
         agg_consensus = None
 
     # ── 3. Current price target ──────────────────────────────────────────────
-    # price_target_upside is filled after joining close prices in main().
-    # Capture the latest consensus target for downstream use if needed.
+    # Historical point-in-time price-target series are not available through the
+    # same endpoint, so the committed batch artifact keeps this feature neutral.
 
     if not has_history and agg_consensus is None:
         return None
@@ -205,7 +205,7 @@ def build_analyst_features_for_ticker(
             "analyst_consensus": consensus,
             "analyst_upgrade_score": upgrade_score,
             "analyst_coverage_count": float(coverage),
-            "price_target_upside": np.nan,  # filled after joining close prices
+            "price_target_upside": 0.0,
             "analyst_sentiment_momentum": momentum,
         })
 
