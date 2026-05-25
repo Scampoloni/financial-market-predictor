@@ -222,7 +222,7 @@ def render() -> None:
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    # ── 3. FEATURE IMPORTANCE -- CONFIG C (Top 15) ───────────────────────────
+    # ── 3. FEATURE IMPORTANCE -- CONFIG D (Top 15) ───────────────────────────
     st.markdown("<h3 style='margin-top:1.5rem'>Feature Importance -- Deployed 5-Day Model (Top 15)</h3>",
                 unsafe_allow_html=True)
     st.markdown(

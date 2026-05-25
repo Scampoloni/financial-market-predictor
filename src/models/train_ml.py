@@ -376,7 +376,8 @@ def run_ablation(configs: list[str] = ("A", "B", "C", "D")) -> dict:
 
     Trains RF, LightGBM (Optuna-tuned), and Stacking on each config.
     Picks the best model per config for the final ablation table.
-    Saves Config C best model as the production model.
+    Saves Config D best model as the production model (STACKING_MODEL_PATH).
+    Config C is retained as a reference artifact (stacking_final_C.pkl).
 
     Returns:
         Dict with results per config (including per-model breakdown).

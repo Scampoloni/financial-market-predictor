@@ -12,7 +12,7 @@ from html import escape as html_escape
 from src.app.utils import get_predictor, TICKERS_SORTED
 from src.config import (
     COMPANY_KEYWORDS, SPAM_KEYWORDS, TICKER_SECTOR_MAP,
-    FEATURES_MARKET_PATH, FEATURES_NLP_PATH, FEATURES_CV_PATH,
+    FEATURES_MARKET_PATH, FEATURES_NLP_PATH, FEATURES_CV_PATH, FEATURES_ANALYST_PATH,
     STACKING_MODEL_PATH, MODEL_21D_PATH, TEST_START,
 )
 
@@ -578,8 +578,14 @@ def _compute_backtest(ticker: str, horizon: int) -> pd.DataFrame | None:
         t_nlp = nlp[nlp["ticker"] == ticker].drop(columns=["ticker"])
         t_cv = cv[cv["ticker"] == ticker].drop(columns=["ticker"])
 
-        # Join features
+        # Join features (market + NLP + CV)
         combined = t_mkt.join(t_nlp, how="inner").join(t_cv, how="inner")
+
+        # Also join analyst features (required for Config D's 66-feature set)
+        if FEATURES_ANALYST_PATH.exists():
+            analyst = pd.read_parquet(FEATURES_ANALYST_PATH)
+            t_analyst = analyst[analyst["ticker"] == ticker].drop(columns=["ticker"])
+            combined = combined.join(t_analyst, how="left")
 
         # One-hot encode sector dummies (model expects sector_*)
         if "sector" in combined.columns:
@@ -612,8 +618,8 @@ def _compute_backtest(ticker: str, horizon: int) -> pd.DataFrame | None:
         if len(combined) < 10:
             return None
 
-        # Run predictions
-        X = combined[feature_cols].fillna(0)
+        # Run predictions — reindex so any still-missing columns are filled with 0
+        X = combined.reindex(columns=feature_cols, fill_value=0)
         proba = model.predict_proba(X)
         up_idx = list(model.classes_).index("UP")
         preds = model.predict(X)

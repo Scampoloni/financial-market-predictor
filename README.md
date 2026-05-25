@@ -122,13 +122,15 @@ financial-market-predictor/
 │   │   ├── pages/
 │   │   │   ├── predictor.py        # Live prediction UI (Plotly charts + cards)
 │   │   │   ├── model_analysis.py   # Ablation results and feature importance
+│   │   │   ├── eda_explorer.py     # Dataset EDA visualizations
 │   │   │   ├── rag_chat.py         # RAG news Q&A chatbot
 │   │   │   └── about.py            # Project overview page
 │   │   └── utils.py                # Cached loaders and UI helpers
 │   ├── data_collection/
 │   │   ├── market_collector.py     # Yahoo Finance OHLCV downloader
 │   │   ├── news_scraper.py         # RSS + NewsAPI headline scraper
-│   │   └── chart_generator.py      # mplfinance candlestick image generator
+│   │   ├── chart_generator.py      # mplfinance candlestick image generator
+│   │   └── build_analyst_features.py  # yfinance analyst ratings collector
 │   ├── features/
 │   │   ├── market_features.py      # 28 technical indicators + target
 │   │   ├── nlp_features.py         # FinBERT/VADER sentiment + sector fallback
@@ -152,7 +154,9 @@ financial-market-predictor/
 │   └── 06_evaluation_ablation.ipynb # Full ablation study and error analysis
 ├── scripts/
 │   ├── finetune_cnn.py             # Domain-adapt EfficientNet-B0 on chart labels
-│   └── train_21d.py                # 21-day horizon model training
+│   ├── train_21d.py                # 21-day horizon model training
+│   ├── verify_results.py           # Reproducibility check — verifies all headline metrics
+│   └── eval_cv_held_out.py         # Held-out test evaluation for CV block
 ├── data/
 │   ├── raw/                        # market_data/, news/, charts/ (gitignored — too large)
 │   └── processed/                  # Feature parquets + ablation results
