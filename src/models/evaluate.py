@@ -118,7 +118,7 @@ def plot_per_class_f1(results: dict[str, dict], y_test: pd.Series) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
     x = np.arange(len(df))
     width = 0.25
-    colors = ["#d62728", "#aec7e8", "#2ca02c"]
+    colors = ["#d62728", "#2ca02c"]
 
     for i, (cls, color) in enumerate(zip(TARGET_CLASSES, colors)):
         ax.bar(x + i * width, df[cls], width, label=cls, color=color, alpha=0.85)
