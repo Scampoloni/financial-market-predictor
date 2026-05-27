@@ -328,11 +328,13 @@ Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlappin
 ## 3. Deployment
 
 - **Deployment URL:** https://financial-market-predictorr.streamlit.app/
-- **Main user flow:**
-  1. User selects a ticker and date range on the **Prediction** page.
-  2. App loads pre-computed artifacts — `models/stacking_final.pkl` (contains the best-performing model, LightGBM in all configs, plus its feature column list; the filename is kept for backwards compatibility), `data/processed/features_market.parquet`, `data/processed/features_nlp.parquet`, and `data/processed/features_cv.parquet` — and returns a directional UP/DOWN probability with a Plotly candlestick chart. Live inference assembles features on-the-fly using `src/models/predict.py`; no `features_combined.parquet` is required.
-  3. User can explore per-block evidence on the **Analysis** page (SHAP feature importance, ablation bar chart).
-  4. User can query the **News Chat** tab (RAG chatbot) for contextual news evidence behind any prediction.
+- **Main user flow (6 tabs):**
+  1. **Prediction** — User selects a ticker and prediction horizon (5-day or 21-day). The app loads pre-computed artifacts (`models/stacking_final.pkl`, `data/processed/features_*.parquet`) and returns a directional UP/DOWN probability with a Plotly candlestick chart. Live inference assembles features on-the-fly via `src/models/predict.py`.
+  2. **Compare** — Side-by-side comparison of two tickers: prediction probability, price chart, and sentiment timeline rendered in parallel columns.
+  3. **Analysis** — Per-block interpretability: SHAP feature importance (ML block), ablation F1 bar chart (A → B → C → D), per-class recall shift, and bootstrap CI visualisation.
+  4. **EDA** — Interactive exploratory data analysis: return distributions, sector composition, volume heatmaps, and feature-target correlation table — drawn directly from the committed parquets.
+  5. **News Chat** — RAG chatbot powered by MiniLM-L6-v2 + FAISS + Claude API. Retrieves and cites the top-5 relevant headlines for a user query. Graceful fallback (returns raw retrieved headlines) when no API key is set.
+  6. **About** — Model card, data provenance, limitations disclaimer, and ethics summary.
 - **Screenshot or short demo:** See [`docs/screenshots/01_prediction_flow.png`](docs/screenshots/01_prediction_flow.png), [`docs/screenshots/02_model_analysis.png`](docs/screenshots/02_model_analysis.png), [`docs/screenshots/03_nlp_cv_integration.png`](docs/screenshots/03_nlp_cv_integration.png).
 
 App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pages/).
