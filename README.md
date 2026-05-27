@@ -373,4 +373,4 @@ If a system like this were deployed at scale, consistent buy/sell signals from m
 - Live deployment URL: https://financial-market-predictorr.streamlit.app/
 - Filled documentation template: `docs/documentation.md`
 
-Submission-specific credentials (if any) must be submitted separately (e.g., Moodle) and must not be committed.
+
