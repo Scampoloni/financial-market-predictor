@@ -24,8 +24,10 @@ ENV/
 .env.local
 .env.*.local
 
-# Data (raw data not tracked — too large)
-data/raw/
+# Data (raw data not tracked — too large, but keep directory skeleton)
+data/raw/**
+!data/raw/**/
+!data/raw/**/.gitkeep
 
 # Model artifacts — committed directly (all files <50 MB)
 # models/*.pkl

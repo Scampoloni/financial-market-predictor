@@ -218,6 +218,7 @@ def _candlestick_chart(df: pd.DataFrame, days: int = 90) -> None:
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def _load_ticker_news_dates(ticker: str) -> dict[str, str]:
     """Return {date_str: headline} for high-sentiment days (|sentiment| > 0.2)."""
     try:
