@@ -62,10 +62,8 @@ FEATURES_ANALYST_PATH = PROCESSED_DIR / "features_analyst.parquet"
 TICKERS_CSV_PATH = METADATA_DIR / "tickers.csv"
 
 # Model artifacts
-XGBOOST_MODEL_PATH = MODELS_DIR / "xgboost_final.pkl"
 STACKING_MODEL_PATH = MODELS_DIR / "stacking_final.pkl"
 MODEL_21D_PATH = MODELS_DIR / "model_21d.pkl"
-SCALER_PATH = MODELS_DIR / "scaler.pkl"
 PCA_NLP_PATH = PROCESSED_DIR / "pca_nlp_embeddings.pkl"   # written by nlp_features.py
 PCA_CV_PATH = MODELS_DIR / "pca_cv.pkl"
 CHART_CNN_PATH = MODELS_DIR / "cnn_finetuned.pth"   # fine-tuned EfficientNet-B0 weights
@@ -88,7 +86,7 @@ TRAIN_END = "2024-06-30"
 VAL_START = "2024-07-01"
 VAL_END = "2024-12-31"
 TEST_START = "2025-01-01"
-TEST_END = "2025-12-31"
+TEST_END = "2026-03-21"   # aligns with DATA_END_DATE; _temporal_split uses only TEST_START (no upper cap)
 
 # Target definition: binary classification
 TARGET_HORIZON_DAYS = 5          # predict 5-trading-day forward return

@@ -35,6 +35,7 @@ from src.config import (
     MODEL_21D_PATH,
     MODELS_DIR,
     RAW_MARKET_DIR,
+    TARGET_HORIZON_DAYS_LONG,
     TEST_START,
     TRAIN_END,
     VAL_END,
@@ -50,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-HORIZON = 21
+HORIZON = TARGET_HORIZON_DAYS_LONG   # 21 trading days (~1 month), from config
 _EXCLUDE = {"ticker", "target", "close", "vix_regime", "rsi_zone",
             "vader_label", "finbert_label", "chart_available"}
 

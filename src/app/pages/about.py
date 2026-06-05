@@ -57,7 +57,7 @@ def render() -> None:
             '<div style="font-size:1.6rem;margin-bottom:6px">📰</div>'
             '<div style="font-weight:700;color:#f59e0b;font-size:1rem;margin-bottom:8px">Block 2: NLP</div>'
             '<div style="color:#94a3b8;font-size:0.85rem;line-height:1.6">'
-            'FinBERT + VADER on <b style="color:#e2e8f0">8,552 news headlines</b><br>'
+            'FinBERT + VADER on <b style="color:#e2e8f0">~6,100 news headlines</b><br>'
             '<span style="color:#475569">Sentiment score, momentum, surprise, dispersion, '
             'news volume z-score, sector fallback. '
             'RAG chatbot for interactive Q&amp;A.</span><br><br>'
@@ -86,8 +86,8 @@ def render() -> None:
                 unsafe_allow_html=True)
 
     rows = [
-        ("#10b981", "Yahoo Finance",    "5yr daily OHLCV for 67 S&P 500 tickers (2020–2026), ~550k rows"),
-        ("#f59e0b", "Financial News",   "RSS feeds (Reuters, MarketWatch) + yfinance news API, 8,552 headlines"),
+        ("#10b981", "Yahoo Finance",    "6yr daily OHLCV for 67 S&P 500 tickers (2020–2026), ~101k rows"),
+        ("#f59e0b", "Financial News",   "RSS feeds (Reuters, MarketWatch) + yfinance news API, ~6,100 headlines"),
         ("#60a5fa", "Candlestick Charts","61,640+ images generated via mplfinance (30-day windows, step=2)"),
         ("#8b5cf6", "Pre-trained Models","ProsusAI/finbert (HuggingFace) · EfficientNet-B0 (torchvision ImageNet)"),
     ]
@@ -160,7 +160,7 @@ def render() -> None:
         ("VIX Level", "CBOE fear gauge. >25 = fear; <18 = complacency."),
         ("Return 1D / 5D / 20D", "Price return over 1-, 5-, and 20-day horizons."),
         ("Price/SMA20 & Price/SMA50", "Distance of price from 20- and 50-day moving averages."),
-        ("Sector Dummies", "One-hot encoding of the GICS sector (11 total)."),
+        ("Sector Dummies", "One-hot encoding of 7 sectors (Tech, Finance, Insurance, Healthcare, Consumer, Energy, Industrial)."),
     ]
     _NLP_FEATURES = [
         ("FinBERT Sentiment", "Finance-domain BERT (ProsusAI/finbert). Score: -1 (negative) to +1 (positive)."),

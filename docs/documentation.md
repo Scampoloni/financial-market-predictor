@@ -79,7 +79,7 @@ Data collection: [`src/data_collection/market_collector.py`](https://github.com/
 
 See *Feature Engineering* in [`notebooks/02_ml_baseline.ipynb`](notebooks/02_ml_baseline.ipynb).
 
-**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, the SIDEWAYS class is eliminated: all observations are reclassified as binary UP (5-day return > 0 %) / DOWN (return ≤ 0 %). No rows are dropped — the ±1 % zone (~23 % of data) is redistributed into UP/DOWN by sign rather than filtered out. This simplification raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py` L273–294](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/features/market_features.py#L273-L294) for the target construction logic.
+**Target variable and binary scope:** The v1 pipeline used a 3-class target (UP / DOWN / SIDEWAYS, where SIDEWAYS = ±1 % 5-day return). In v2, the SIDEWAYS class is eliminated: all observations are reclassified as binary UP (5-day return > 0 %) / DOWN (return ≤ 0 %). No rows are dropped — the ±1 % zone (~23 % of data) is redistributed into UP/DOWN by sign rather than filtered out. This simplification raises CV F1 from ~0.33 to ~0.49. See Iteration 1→2 in Section 2A.4. See [`src/features/market_features.py` L270–291](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/features/market_features.py#L270-L291) for the target construction logic.
 
 #### EDA Key Findings
 
@@ -104,7 +104,7 @@ Full exploratory analysis in [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb).
 - **Models tested:** RandomForest (fixed hyperparameters, cross-validated via 5-fold TimeSeriesSplit), LightGBM (Optuna, 40 trials), StackingClassifier (RF + XGB + LGB meta-ensemble).
 - **Why these models were chosen:** All three are strong on tabular data with mixed feature types. LightGBM handles large datasets efficiently and is well-suited to financial time series. Stacking tests whether complementary learner biases can be exploited.
 
-See [`src/models/train_ml.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py) (RF: [`train_random_forest` L164](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L164); LightGBM + Optuna: [`_optuna_lgb` L194](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L194); Stacking: [`train_stacking` L256](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L256); ablation runner: [`run_ablation` L377](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L377)) for training logic and [`src/config.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/config.py) for hyperparameter grids.
+See [`src/models/train_ml.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py) (RF: [`train_random_forest` L161](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L161); LightGBM + Optuna: [`_optuna_lgb` L191](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L191); Stacking: [`train_stacking` L253](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L253); ablation runner: [`run_ablation` L374](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/models/train_ml.py#L374)) for training logic and [`src/config.py`](https://github.com/Scampoloni/financial-market-predictor/blob/main/src/config.py) for hyperparameter grids.
 
 #### 2A.4 Model Comparison and Iterations
 
@@ -166,14 +166,14 @@ Ablation results stored in [`data/processed/ablation_results.json`](data/process
 
 | Entry | Source name or link | Type | Size | Role in this block |
 | --- | --- | --- | --- | --- |
-| 1 | RSS financial news feeds (Yahoo Finance, Reuters, CNBC, Seeking Alpha) | Unstructured text (headlines) | ~6,200 headlines across 67 tickers | Primary sentiment signal |
-| 2 | [NewsAPI](https://newsapi.org) | Unstructured text (headlines + snippets) | ~2,350 additional headlines | Supplementary coverage for low-news tickers |
+| 1 | RSS financial news feeds (Yahoo Finance, Reuters, CNBC, Seeking Alpha) + yfinance per-ticker news API | Unstructured text (headlines) | ~6,100 headline-rows across 67 tickers | Primary sentiment signal |
+| 2 | [NewsAPI](https://newsapi.org) | Unstructured text (headlines + snippets) | Not collected in this run (requires `NEWS_API_KEY` in .env) | Supplementary coverage for low-news tickers |
 | 3 | [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert) (HuggingFace) | Pre-trained transformer model | ~440 MB | Sentiment scoring model |
 | 4 | [Yahoo Finance via yfinance](https://finance.yahoo.com) — `ticker.upgrades_downgrades` + `ticker.recommendations` | Analyst rating time series (structured) | 67 tickers × ~1,508 dates; historical firm-level upgrades/downgrades + monthly consensus counts | 5 analyst features: `analyst_consensus`, `analyst_upgrade_score`, `analyst_coverage_count`, `price_target_upside`, `analyst_sentiment_momentum` |
 
 News collection: [`src/data_collection/news_scraper.py`](src/data_collection/news_scraper.py).  
 Analyst feature builder: [`src/data_collection/build_analyst_features.py`](src/data_collection/build_analyst_features.py).  
-Total corpus: ~8,550 headline-rows stored in `data/raw/news/`.
+Total corpus: ~6,100 headline-rows stored in `data/raw/news/` (67 per-ticker `.parquet` files; NewsAPI was not enabled in this run).
 
 #### 2B.2 Preprocessing and Prompt Design
 
@@ -198,7 +198,7 @@ Total corpus: ~8,550 headline-rows stored in `data/raw/news/`.
 #### 2B.3 Approach Selection
 
 - **Approach used:** Dual-model sentiment scoring (FinBERT transformer + VADER lexicon) combined with PCA-compressed FinBERT embeddings; RAG chatbot as supplementary NLP feature.
-- **Alternatives considered:** Classical TF-IDF + logistic regression (rejected: no contextual understanding); GPT-4 scoring (rejected: cost and rate limits at 8,552 headlines); single-model VADER-only (rejected: misses domain-specific financial language).
+- **Alternatives considered:** Classical TF-IDF + logistic regression (rejected: no contextual understanding); GPT-4 scoring (rejected: cost and rate limits at ~6,100 headlines); single-model VADER-only (rejected: misses domain-specific financial language).
 
 See *Approach Selection* in [`notebooks/03_nlp_pipeline.ipynb`](notebooks/03_nlp_pipeline.ipynb#approach-selection).
 
@@ -331,8 +331,8 @@ Bootstrap 95 % CI for Config C: [0.487, 0.502] (N = 2,000 resamples). Overlappin
 - **Main user flow (6 tabs):**
   1. **Prediction** — User selects a ticker and prediction horizon (5-day or 21-day). The app loads pre-computed artifacts (`models/stacking_final.pkl`, `data/processed/features_*.parquet`) and returns a directional UP/DOWN probability with a Plotly candlestick chart. Live inference assembles features on-the-fly via `src/models/predict.py`.
   2. **Compare** — Side-by-side comparison of two tickers: prediction probability, price chart, and sentiment timeline rendered in parallel columns.
-  3. **Analysis** — Per-block interpretability: SHAP feature importance (ML block), ablation F1 bar chart (A → B → C → D), per-class recall shift, and bootstrap CI visualisation.
-  4. **EDA** — Interactive exploratory data analysis: return distributions, sector composition, volume heatmaps, and feature-target correlation table — drawn directly from the committed parquets.
+  3. **Analysis** — Per-block interpretability: SHAP values (TreeExplainer on LightGBM, 200 held-out test rows) — beeswarm summary plot + block-level attribution breakdown; ablation F1 bar chart (A → B → C → D); per-class recall shift.
+  4. **EDA** — Interactive exploratory data analysis: class balance, ticker price history, sector breakdown, FinBERT sentiment distribution, news volume by ticker, and CV PCA embedding scatter — drawn directly from the committed parquets.
   5. **News Chat** — RAG chatbot powered by MiniLM-L6-v2 + FAISS + Claude API. Retrieves and cites the top-5 relevant headlines for a user query. Graceful fallback (returns raw retrieved headlines) when no API key is set.
   6. **About** — Model card, data provenance, limitations disclaimer, and ethics summary.
 - **Screenshot or short demo:** See [`docs/screenshots/01_prediction_flow.png`](docs/screenshots/01_prediction_flow.png), [`docs/screenshots/02_model_analysis.png`](docs/screenshots/02_model_analysis.png), [`docs/screenshots/03_nlp_cv_integration.png`](docs/screenshots/03_nlp_cv_integration.png).
@@ -401,8 +401,8 @@ App entry point: [`app.py`](app.py). Page modules: [`src/app/pages/`](src/app/pa
 ## 5. Optional Bonus Evidence
 
 - [x] Third selected block implemented with strong quality — Computer Vision (EfficientNet-B0, domain fine-tuning, bi-daily chart generation, PCA compression, full ablation measurement).
-- [x] More than two data sources used with clear added value — Yahoo Finance OHLCV, RSS feeds, NewsAPI, FinBERT (HuggingFace), EfficientNet-B0 (torchvision) with fine-tuning on domain data.
-- [x] Extended evaluation — Bootstrap 95 % CI (N = 2,000), 5-fold TimeSeriesSplit, per-class precision/recall/F1, multi-horizon comparison (5-day vs 21-day), per-class shift analysis (DOWN/UP recall trade-off across configs), statistical significance of ablation deltas. See [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
+- [x] More than two data sources used with clear added value — Yahoo Finance OHLCV, RSS feeds + yfinance news API, ProsusAI/FinBERT (HuggingFace), EfficientNet-B0 (torchvision) with fine-tuning on domain data.
+- [x] Extended evaluation — Bootstrap 95 % CI (N = 2,000), 5-fold TimeSeriesSplit, per-class precision/recall/F1, multi-horizon comparison (5-day vs 21-day), per-class shift analysis (DOWN/UP recall trade-off across configs), statistical significance of ablation deltas, **SHAP TreeExplainer** (200 held-out test rows, beeswarm + block-level attribution). See [`notebooks/06_evaluation_ablation.ipynb`](notebooks/06_evaluation_ablation.ipynb).
 - [x] Ethics, bias, or fairness analysis — See dedicated Section 6 below.
 - [x] Comprehensive test suite — 76 pytest tests covering feature parquet contracts (column names, value ranges, binary flags), ablation result validity (including Config D), 21-day model bundle contracts, VADER and FinBERT pipeline output format, CV PCA dimension and variance checks, temporal split non-overlap, and model artifact integrity. All tests run without network access or GPU. See [`tests/`](tests/).
 
@@ -417,7 +417,7 @@ Evidence for selected bonus items: full ablation results in [`data/processed/abl
 ### 6.1 Data Bias
 
 - **Survivorship bias:** The ticker universe consists of 67 currently-listed S&P 500 large-caps. Companies that were delisted, went bankrupt, or were removed from the index between 2020 and 2026 are absent. This biases the training distribution toward historically successful firms and may overstate UP prediction reliability — fallen stocks, which would produce DOWN labels, are invisible to the model.
-- **English-language concentration:** All news inputs come from English-language RSS feeds and NewsAPI, dominated by US financial media (Reuters, MarketWatch, Yahoo Finance). Non-English coverage of the same companies — particularly relevant for companies with significant European or Asian operations — is invisible to the NLP block, which may distort sentiment for multinational firms.
+- **English-language concentration:** All news inputs come from English-language RSS feeds and yfinance news API, dominated by US financial media (Reuters, MarketWatch, Yahoo Finance). Non-English coverage of the same companies — particularly relevant for companies with significant European or Asian operations — is invisible to the NLP block, which may distort sentiment for multinational firms.
 - **Source concentration:** A small number of high-volume news feeds account for most headlines. Sentiment driven by niche, regional, or specialised outlets is under-represented. A story breaking first in a domain-specific publication may not reach the model's pipeline in time to predict the associated price move.
 - **Temporal distribution shift:** The model is trained on 2020–2024 data that includes the COVID-19 crash, post-pandemic recovery, and aggressive Fed rate cycles — exceptional macro regimes. Performance on future data under different macro conditions (e.g. prolonged low-volatility, deflationary environments) is not guaranteed.
 
