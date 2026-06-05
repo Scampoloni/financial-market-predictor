@@ -112,26 +112,22 @@ def _fetch_info(ticker: str) -> dict:
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def _load_sentiment_timeline(ticker: str) -> pd.DataFrame | None:
-    """Load pre-computed daily sentiment + close price for a ticker (last 60 days)."""
-    from src.config import FEATURES_NLP_PATH, FEATURES_MARKET_PATH
+def _load_sentiment_only(ticker: str) -> pd.DataFrame | None:
+    """Load NLP sentiment from parquet for ticker.
+
+    Returns DataFrame with [finbert_sentiment, is_sentiment_imputed] indexed by date,
+    or None if ticker has no data in the parquet.
+    Has meaningful sentiment only if max |finbert_sentiment| > 0.05.
+    """
+    from src.config import FEATURES_NLP_PATH
 
     try:
         nlp = pd.read_parquet(FEATURES_NLP_PATH)
         nlp.index = pd.to_datetime(nlp.index)
         t_nlp = nlp[nlp["ticker"] == ticker][["finbert_sentiment", "is_sentiment_imputed"]]
-
-        market = pd.read_parquet(FEATURES_MARKET_PATH)
-        market.index = pd.to_datetime(market.index)
-        t_mkt = market[market["ticker"] == ticker][["close"]]
-
-        # Left join on market dates so we always get market rows, fill NLP gaps
-        merged = t_mkt.join(t_nlp, how="left").tail(60)
-        merged["finbert_sentiment"] = merged["finbert_sentiment"].fillna(0.0)
-        merged["is_sentiment_imputed"] = merged["is_sentiment_imputed"].fillna(1.0)
-        if len(merged) < 3:
+        if t_nlp.empty:
             return None
-        return merged
+        return t_nlp
     except Exception:
         return None
 
@@ -236,69 +232,110 @@ def _load_ticker_news_dates(ticker: str) -> dict[str, str]:
         return {}
 
 
-def _sentiment_timeline(ticker: str, nlp_pct: float | None = None) -> None:
+def _sentiment_timeline(
+    ticker: str,
+    ohlcv_df: pd.DataFrame | None = None,
+    nlp_pct: float | None = None,
+) -> None:
     """Render a dual-axis chart: closing price (line) + daily sentiment (bars).
 
+    Uses live OHLCV for the price line so dates are always current.
+    Sentiment bars are drawn only when meaningful pre-computed data exists.
     News events with |sentiment| > 0.2 are annotated with vertical markers.
     """
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
 
-    data = _load_sentiment_timeline(ticker)
-    if data is None:
+    # ── Build price series from live OHLCV (last 30 trading days) ────────────
+    price_series: pd.Series | None = None
+    if ohlcv_df is not None and not ohlcv_df.empty:
+        close_col = "Close" if "Close" in ohlcv_df.columns else "close"
+        if close_col in ohlcv_df.columns:
+            price_series = ohlcv_df[close_col].tail(30)
+            price_series.index = pd.to_datetime(price_series.index)
+
+    # ── Load NLP sentiment from parquet ──────────────────────────────────────
+    sentiment_data = _load_sentiment_only(ticker)
+    has_sentiment = False
+    if sentiment_data is not None and not sentiment_data.empty:
+        # Only show sentiment bars if there's meaningful signal (>5 % of rows non-zero)
+        max_abs = sentiment_data["finbert_sentiment"].abs().max()
+        if max_abs > 0.05:
+            has_sentiment = True
+            # Align to price dates when available, otherwise take last 30 rows
+            if price_series is not None:
+                sentiment_data = sentiment_data.reindex(price_series.index, fill_value=0.0)
+                sentiment_data["is_sentiment_imputed"] = sentiment_data[
+                    "is_sentiment_imputed"
+                ].fillna(1.0)
+            else:
+                sentiment_data = sentiment_data.tail(30)
+
+    if price_series is None and not has_sentiment:
         st.markdown(
             f'<div class="glass-card" style="text-align:center;color:{_MUTED};font-size:0.88rem">'
-            f'Limited news data available for {html_escape(ticker)}. '
-            f'Using sector-level sentiment.</div>',
+            f'No price data available for {html_escape(ticker)}.</div>',
             unsafe_allow_html=True,
         )
         return
 
-    # Last 30 trading days
-    data = data.tail(30)
-
-    bar_colors = [_UP_COLOR if s > 0 else _DOWN_COLOR for s in data["finbert_sentiment"]]
-
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    fig.add_trace(go.Scatter(
-        x=data.index, y=data["close"],
-        mode="lines", name="Close",
-        line=dict(color="#94a3b8", width=1.5),
-    ), secondary_y=False)
+    # ── Price line ────────────────────────────────────────────────────────────
+    if price_series is not None:
+        fig.add_trace(go.Scatter(
+            x=price_series.index,
+            y=price_series.values,
+            mode="lines",
+            name="Close",
+            line=dict(color="#94a3b8", width=1.5),
+        ), secondary_y=False)
 
-    fig.add_trace(go.Bar(
-        x=data.index, y=data["finbert_sentiment"],
-        name="Sentiment", marker_color=bar_colors, opacity=0.7,
-    ), secondary_y=True)
+    # ── Sentiment bars ────────────────────────────────────────────────────────
+    if has_sentiment:
+        bar_colors = [
+            _UP_COLOR if s > 0 else _DOWN_COLOR
+            for s in sentiment_data["finbert_sentiment"]
+        ]
+        fig.add_trace(go.Bar(
+            x=sentiment_data.index,
+            y=sentiment_data["finbert_sentiment"],
+            name="Sentiment",
+            marker_color=bar_colors,
+            opacity=0.7,
+        ), secondary_y=True)
 
-    # ── News event annotations (vertical markers on significant days) ─────────
-    news_dates = _load_ticker_news_dates(ticker)
-    significant_days = data[data["finbert_sentiment"].abs() > 0.2].index
-    for date in significant_days:
-        date_str = str(date.date()) if hasattr(date, "date") else str(date)[:10]
-        headline = news_dates.get(date_str, f"Significant sentiment ({date_str})")
-        marker_color = _UP_COLOR if data.loc[date, "finbert_sentiment"] > 0 else _DOWN_COLOR
-        fig.add_vline(
-            x=date,
-            line_color=marker_color,
-            line_dash="dot",
-            line_width=1.5,
-            opacity=0.6,
-        )
-        fig.add_annotation(
-            x=date,
-            y=1.0,
-            yref="paper",
-            text="📰",
-            showarrow=False,
-            font=dict(size=10),
-            hovertext=headline,
-            bgcolor="#1e293b",
-            bordercolor=marker_color,
-            borderpad=2,
-            yshift=10,
-        )
+        # ── News event annotations (vertical markers on significant days) ─────
+        news_dates = _load_ticker_news_dates(ticker)
+        significant_days = sentiment_data[
+            sentiment_data["finbert_sentiment"].abs() > 0.2
+        ].index
+        for date in significant_days:
+            date_str = str(date.date()) if hasattr(date, "date") else str(date)[:10]
+            headline = news_dates.get(date_str, f"Significant sentiment ({date_str})")
+            marker_color = (
+                _UP_COLOR if sentiment_data.loc[date, "finbert_sentiment"] > 0 else _DOWN_COLOR
+            )
+            fig.add_vline(
+                x=date,
+                line_color=marker_color,
+                line_dash="dot",
+                line_width=1.5,
+                opacity=0.6,
+            )
+            fig.add_annotation(
+                x=date,
+                y=1.0,
+                yref="paper",
+                text="📰",
+                showarrow=False,
+                font=dict(size=10),
+                hovertext=headline,
+                bgcolor="#1e293b",
+                bordercolor=marker_color,
+                borderpad=2,
+                yshift=10,
+            )
 
     fig.update_layout(
         template="plotly_dark",
@@ -310,13 +347,19 @@ def _sentiment_timeline(ticker: str, nlp_pct: float | None = None) -> None:
         font=dict(family="Inter, sans-serif", size=11),
     )
     fig.update_yaxes(
-        title_text="Close", gridcolor="#1e293b", zeroline=False,
-        showticklabels=True, tickfont=dict(color="#64748b", size=10),
+        title_text="Close",
+        gridcolor="#1e293b",
+        zeroline=False,
+        showticklabels=True,
+        tickfont=dict(color="#64748b", size=10),
         secondary_y=False,
     )
     fig.update_yaxes(
-        title_text="Sentiment", gridcolor="rgba(0,0,0,0)", zeroline=True,
-        zerolinecolor="#1e293b", showticklabels=True,
+        title_text="Sentiment" if has_sentiment else "",
+        gridcolor="rgba(0,0,0,0)",
+        zeroline=True,
+        zerolinecolor="#1e293b",
+        showticklabels=has_sentiment,
         tickfont=dict(color="#64748b", size=10),
         secondary_y=True,
     )
@@ -324,20 +367,33 @@ def _sentiment_timeline(ticker: str, nlp_pct: float | None = None) -> None:
 
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    if nlp_pct is not None:
-        if nlp_pct >= 1.0:
-            note = (f'NLP sentiment features contribute <b style="color:#f59e0b">{nlp_pct:.1f}%</b>'
-                    f' of total model feature importance.')
-        else:
-            note = (
-                f'Sentiment chart shows pre-computed FinBERT scores (last 30 days). '
-                f'In this run NLP features account for <b style="color:#f59e0b">{nlp_pct:.1f}%</b> '
-                f'of model importance — consistent with EMH: public news is largely priced in at a 5-day horizon.'
-            )
-        st.markdown(
-            f'<p style="color:{_MUTED};font-size:0.82rem;margin-top:-0.5rem">{note}</p>',
-            unsafe_allow_html=True,
+    # ── Footnote ──────────────────────────────────────────────────────────────
+    if not has_sentiment:
+        note = (
+            f'No pre-computed FinBERT sentiment for <b>{html_escape(ticker)}</b> '
+            f'in the training store — live news sentiment is used for predictions only.'
         )
+    elif nlp_pct is not None and nlp_pct >= 1.0:
+        note = (
+            f'NLP sentiment features contribute '
+            f'<b style="color:#f59e0b">{nlp_pct:.1f}%</b>'
+            f' of total model feature importance.'
+        )
+    else:
+        pct_str = (
+            f'<b style="color:#f59e0b">{nlp_pct:.1f}%</b> of model importance'
+            if nlp_pct is not None
+            else "a small share of model importance"
+        )
+        note = (
+            f'Sentiment chart shows pre-computed FinBERT scores (last 30 days). '
+            f'NLP features account for {pct_str} — consistent with EMH: '
+            f'public news is largely priced in at a 5-day horizon.'
+        )
+    st.markdown(
+        f'<p style="color:{_MUTED};font-size:0.82rem;margin-top:-0.5rem">{note}</p>',
+        unsafe_allow_html=True,
+    )
 
 
 # ── Prediction card ──────────────────────────────────────────────────────────
@@ -570,17 +626,27 @@ def _compute_backtest(ticker: str, horizon: int) -> pd.DataFrame | None:
         feature_cols = artifact["feature_cols"]
 
         # Load features
+        from src.config import PROCESSED_DIR
         mkt = pd.read_parquet(FEATURES_MARKET_PATH)
         nlp = pd.read_parquet(FEATURES_NLP_PATH)
         cv = pd.read_parquet(FEATURES_CV_PATH)
+        analyst_path = PROCESSED_DIR / "features_analyst.parquet"
 
         # Filter to ticker
         t_mkt = mkt[mkt["ticker"] == ticker].copy()
         t_nlp = nlp[nlp["ticker"] == ticker].drop(columns=["ticker"])
         t_cv = cv[cv["ticker"] == ticker].drop(columns=["ticker"])
 
-        # Join features
-        combined = t_mkt.join(t_nlp, how="inner").join(t_cv, how="inner")
+        # Join features — left join so all market dates are kept even when
+        # NLP/CV parquets have no data for this ticker (smoke dataset coverage).
+        # Missing NLP/CV values are filled with 0 before model.predict (line below).
+        combined = t_mkt.join(t_nlp, how="left").join(t_cv, how="left")
+
+        # Analyst features — available for all 67 tickers
+        if analyst_path.exists():
+            t_analyst = pd.read_parquet(analyst_path)
+            t_analyst = t_analyst[t_analyst["ticker"] == ticker].drop(columns=["ticker"])
+            combined = combined.join(t_analyst, how="left")
 
         # One-hot encode sector dummies (model expects sector_*)
         if "sector" in combined.columns:
@@ -838,7 +904,7 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     nlp_pct = _nlp_importance_pct(predictor, selected_horizon)
-    _sentiment_timeline(ticker, nlp_pct=nlp_pct)
+    _sentiment_timeline(ticker, ohlcv_df=ohlcv, nlp_pct=nlp_pct)
 
     # ── Prediction ───────────────────────────────────────────────────────────
     if run:
@@ -932,9 +998,9 @@ def render() -> None:
             unsafe_allow_html=True,
         )
 
-        # Build feature vector for annotation
+        # Build feature vector for annotation (includes analyst features)
         latest_row = market_feat.iloc[-1]
-        feature_vec = pd.concat([latest_row, nlp_feat, cv_feat])
+        feature_vec = pd.concat([latest_row, nlp_feat, analyst_feat, cv_feat])
         _render_feature_drivers(predictor, selected_horizon, feature_vec)
 
         # ── Headlines ────────────────────────────────────────────────────────
