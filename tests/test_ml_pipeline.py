@@ -27,6 +27,39 @@ def test_predictor_exposes_known_horizons() -> None:
     assert predictor.has_model(21) in (True, False)
 
 
+def test_live_inference_restores_saved_sector_dummy() -> None:
+    """Live rows must encode the sector dummy expected by the saved model."""
+    import numpy as np
+    import pandas as pd
+
+    class RecordingModel:
+        classes_ = np.array(["DOWN", "UP"])
+
+        def predict_proba(self, frame):
+            self.seen = frame.copy()
+            return np.array([[0.4, 0.6]])
+
+    model = RecordingModel()
+    feature_cols = ["return_1d", "sector_Technology", "sector_Energy"]
+    predictor = LivePredictor()
+    predictor._models[5] = (model, feature_cols)
+
+    market = pd.DataFrame(
+        {"return_1d": [0.01]},
+        index=pd.DatetimeIndex(["2026-07-17"]),
+    )
+    predictor.predict_from_features(
+        "AAPL",
+        market,
+        pd.Series(dtype=float),
+        pd.Series(dtype=float),
+        horizon=5,
+    )
+
+    assert model.seen.loc[0, "sector_Technology"] == 1.0
+    assert model.seen.loc[0, "sector_Energy"] == 0.0
+
+
 def test_temporal_split_config_no_leakage() -> None:
     """The train→val→test transition must be strictly sequential."""
     import pandas as pd

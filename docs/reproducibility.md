@@ -2,7 +2,7 @@
 
 ## Supported environment
 
-Use Python 3.10 or 3.11 and install `requirements-pinned.txt` when compatible with the local platform. `requirements.txt` is more flexible but does not guarantee identical serialised-model behaviour. The project has primarily been exercised on Windows.
+Use Python 3.13. The exact versions in `requirements-pinned.txt` were verified together on Python 3.13 / Windows 11; `requirements.txt` is more flexible but does not guarantee identical serialised-model behaviour.
 
 ## Lightweight verification
 
@@ -16,6 +16,21 @@ python -m py_compile src/models/splits.py src/models/train_ml.py scripts/train_2
 ```
 
 These checks do not download raw market data, invoke FinBERT, train the CNN, or call paid APIs.
+
+## Tracked smoke pipeline
+
+The tracked smoke dataset verifies data and feature-pipeline plumbing in a clean checkout:
+
+```powershell
+python scripts/use_smoke_data.py --activate
+python -m src.features.market_features --test
+python -m src.features.nlp_features --test
+python -m src.data_collection.chart_generator --test
+python -m src.features.cv_features --test
+python scripts/use_smoke_data.py --restore
+```
+
+On the audited Windows/Python 3.13 environment this sequence completed in about 92 seconds. The bundled smoke-news files are empty and the three generated charts are insufficient to fit ten PCA components, so the run deliberately produces neutral NLP features and zero CV-PCA features. It verifies paths, schemas, imports, feature generation, and safe raw-data restoration; it is not a model-quality test and cannot run the temporal A/B evaluation.
 
 ## Audited A/B evaluation rerun
 
@@ -41,3 +56,9 @@ Copy `.env.example` to `.env`. `NEWS_API_KEY`, `CLAUDE_API_KEY`, and `OPENAI_API
 6. Run `python -m src.models.train_ml` and save predictions, metrics, class balance, data hash, and model metadata.
 
 The full workflow requires substantial disk space, data downloads, a local model download, and potentially hours of CPU/GPU compute. It is not expected to run in CI.
+
+The audited checkout used approximately 1.85 GiB for the pinned virtual environment, 243 MiB for current raw/processed/model data, and 114 MiB for `.git`. Allow at least 3 GiB plus any external Hugging Face cache and additional chart snapshots.
+
+## Streamlit deployment
+
+Streamlit Community Cloud's Python version is selected in the deployment's Advanced settings rather than `.streamlit/config.toml`. Configure the public app to deploy `main` with Python 3.13, then reboot or redeploy and verify the rendered tabs and disclaimer.

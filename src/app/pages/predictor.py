@@ -60,10 +60,10 @@ def _feat_direction(name: str, value: float) -> tuple[str, str]:
 def _signal_strength(conf: float) -> tuple[str, str]:
     """Return a restrained display label for an uncalibrated model score."""
     if conf >= 0.65:
-        return "Higher model confidence", _UP_COLOR
+        return "Large probability separation", _UP_COLOR
     if conf >= 0.55:
-        return "Moderate model confidence", "#3b82f6"
-    return "Low model confidence", _AMBER
+        return "Moderate probability separation", "#3b82f6"
+    return "Small probability separation", _AMBER
 
 
 # ── News relevance filter ────────────────────────────────────────────────────
@@ -387,8 +387,8 @@ def _sentiment_timeline(
         )
         note = (
             f'Sentiment chart shows pre-computed FinBERT scores (last 30 days). '
-            f'NLP features account for {pct_str} — consistent with EMH: '
-            f'public news is largely priced in at a 5-day horizon.'
+            f'NLP features account for {pct_str}. Feature importance is descriptive '
+            f'and does not establish predictive value or market efficiency.'
         )
     st.markdown(
         f'<p style="color:{_MUTED};font-size:0.82rem;margin-top:-0.5rem">{note}</p>',
@@ -413,8 +413,8 @@ def _render_prediction_card(result: dict) -> None:
 
     signal_label, signal_color = _signal_strength(conf)
 
-    # Baseline-relative confidence: how far above 50% coin-flip
-    baseline_delta = (conf - 0.5) * 100  # pp above random
+    # Descriptive separation from an even class probability. This is not an edge.
+    baseline_delta = (conf - 0.5) * 100
     baseline_color = _UP_COLOR if baseline_delta >= 0 else _DOWN_COLOR
     # Width of the confidence fill relative to 50%
     fill_pct = min(int((conf - 0.5) * 200), 100)  # 0-100% of right half
@@ -427,14 +427,14 @@ def _render_prediction_card(result: dict) -> None:
         f'<div style="font-size:1.8rem;font-weight:800;color:{color};margin:4px 0;'
         f'letter-spacing:-0.02em">{pred}</div>'
         f'<div style="color:{_MUTED};font-size:0.88rem">'
-        f'Model confidence (not calibrated): <b style="color:{color}">{conf:.0%}</b>'
+        f'Model score (not calibrated): <b style="color:{color}">{conf:.0%}</b>'
         f' &nbsp;·&nbsp; <span style="color:{baseline_color};font-size:0.82rem">'
-        f'{baseline_delta:+.1f} pp vs 50% baseline</span></div>'
+        f'{baseline_delta:+.1f} pp from 50%</span></div>'
         f'<div style="margin:8px 0 4px"><span style="background:{signal_color}18;color:{signal_color};'
         f'padding:3px 12px;border-radius:20px;font-size:0.78rem;font-weight:700">'
         f'{signal_label}</span></div>'
         f'<div style="margin:8px 0 4px;font-size:0.75rem;color:{_MUTED}">'
-        f'Edge above random chance:</div>'
+        f'Probability separation (not expected performance):</div>'
         f'<div style="background:#1e293b;border-radius:6px;height:6px;overflow:hidden;margin-bottom:12px">'
         f'<div style="width:50%;height:100%;background:#1e293b;display:inline-block"></div>'
         f'<div style="width:{fill_pct}%;height:6px;background:{baseline_color};'
@@ -609,7 +609,7 @@ _MODEL_PATHS = {5: STACKING_MODEL_PATH, 21: MODEL_21D_PATH}
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _compute_backtest(ticker: str, horizon: int) -> pd.DataFrame | None:
-    """Run model predictions on held-out test set features for a ticker.
+    """Run legacy model predictions on reporting-period features for a ticker.
 
     Returns DataFrame with columns: date, actual, predicted, confidence, correct.
     Uses pre-saved feature parquets — no live data fetching.
@@ -778,8 +778,8 @@ def _render_backtest(ticker: str, horizon: int) -> None:
 
         st.markdown(
             f'<p style="color:{_MUTED};font-size:0.78rem;margin-top:0.5rem">'
-            f'Historical performance shown on the held-out test set (2025). '
-            f'Not representative of future performance.</p>',
+            f'Legacy diagnostic performance from a reporting period inspected during development. '
+            f'It is not the audited A/B result and is not representative of future performance.</p>',
             unsafe_allow_html=True,
         )
 
@@ -890,7 +890,11 @@ def render() -> None:
                 st.rerun()
 
     # ── Chart ────────────────────────────────────────────────────────────────
-    ohlcv = _fetch_ohlcv(ticker)
+    try:
+        ohlcv = _fetch_ohlcv(ticker)
+    except Exception:
+        ohlcv = pd.DataFrame()
+        st.warning("Live market data is temporarily unavailable. Charts and estimates are disabled.")
     if not ohlcv.empty:
         days = _CHART_PERIODS[st.session_state.chart_period]
         _candlestick_chart(ohlcv, days=days)
@@ -907,6 +911,10 @@ def render() -> None:
     _sentiment_timeline(ticker, ohlcv_df=ohlcv, nlp_pct=nlp_pct)
 
     # ── Prediction ───────────────────────────────────────────────────────────
+    if run and ohlcv.empty:
+        st.error("Cannot generate an estimate without current market data. Please try again later.")
+        run = False
+
     if run:
         results = {}
         market_feat = None

@@ -1,4 +1,4 @@
-# Exact pinned versions verified 2026-05-23 on Python 3.10 (Windows 11)
+# Exact pinned versions verified 2026-07-20 on Python 3.13 (Windows 11)
 # Use requirements.txt for flexible installs; this file for exact reproducibility.
 # To install: pip install -r requirements-pinned.txt
 #

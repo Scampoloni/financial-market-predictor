@@ -18,9 +18,9 @@ from src.config import TARGET_CLASSES, CV_FOLDS, STACKING_MODEL_PATH, TEST_START
 _MUTED = "#64748b"
 _CFG_NAMES = {
     "A": "Market only",
-    "B": "Market + NLP",
-    "C": "Market + NLP + CV",
-    "D": "Market + NLP + CV + Analyst ✓",   # ✓ = corrected analyst data
+    "B": "Market + NLP + analyst (legacy)",
+    "C": "Market + NLP + CV + analyst (legacy)",
+    "D": "Same 66 columns, rebuilt analyst data",
 }
 _CFG_COLORS = {
     "A": "#94a3b8",
@@ -68,7 +68,7 @@ def _load_importances() -> pd.Series | None:
 
 @st.cache_data(show_spinner=False)
 def _load_shap_data() -> tuple[np.ndarray, pd.DataFrame, list[str]] | None:
-    """Compute SHAP values for 200 held-out test rows. Cached after first call."""
+    """Compute SHAP values for 200 legacy reporting rows. Cached after first call."""
     try:
         import shap as _shap
         from src.models.train_ml import load_combined_features
@@ -109,9 +109,13 @@ def render() -> None:
     st.markdown("<h2 style='margin-bottom:4px'>Model Analysis</h2>", unsafe_allow_html=True)
     st.markdown(
         "<p style='color:#64748b;margin-bottom:1.5rem;font-size:0.9rem'>"
-        "Ablation study measuring the marginal contribution of each feature block. "
-        "Same temporal split, same hyperparameters -- only features vary.</p>",
+        "Legacy diagnostic ablation retained for transparency.</p>",
         unsafe_allow_html=True,
+    )
+    st.warning(
+        "These A-D artefacts pre-date the release audit. Only the separate purged A/B rerun "
+        "(Market-only F1 0.4918; Market + NLP F1 0.4887) is a current reporting result. "
+        "C requires a rerun and D is invalid for historical reporting."
     )
 
     results = load_ablation_results()
@@ -175,8 +179,8 @@ def render() -> None:
     )
     st.markdown(
         '<p style="color:#475569;font-size:0.8rem;margin-top:6px">'
-        'Temporal train/test split: train &le; 2024-06-30, val = 2024 H2, test = 2025. '
-        '5-fold TimeSeriesSplit CV. Binary target: 5-day forward return direction.</p>',
+        'Legacy partitions: train through 2024 H1, validation in 2024 H2, reporting from 2025. '
+        'These stored results pre-date horizon purging and date-grouped CV; diagnostic only.</p>',
         unsafe_allow_html=True,
     )
 
@@ -294,7 +298,7 @@ def render() -> None:
         '<p style="color:#64748b;font-size:0.85rem;margin-bottom:0.8rem">'
         'SHAP (SHapley Additive exPlanations) measures each feature\'s <em>marginal contribution</em> '
         'to individual predictions — more reliable than MDI for correlated features. '
-        'Computed via TreeExplainer on 200 held-out 2025 test rows.</p>',
+        'Computed via TreeExplainer on 200 legacy 2025 reporting rows.</p>',
         unsafe_allow_html=True,
     )
 
@@ -436,8 +440,8 @@ def render() -> None:
         st.markdown(
             '<p style="color:#475569;font-size:0.8rem;margin-top:6px">'
             '&#9733; = best model per config (selected by validation F1). '
-            'Stacking CV score = held-out validation F1 (TimeSeriesSplit KFold CV not applicable); '
-            'RF and LightGBM CV scores are true 5-fold TimeSeriesSplit means.</p>',
+            'Stored RF/LightGBM scores use the legacy row-level TimeSeriesSplit; '
+            'the stacking score is a validation proxy. None uses the audited date-grouped protocol.</p>',
             unsafe_allow_html=True,
         )
 
@@ -507,61 +511,25 @@ def render() -> None:
     analyst_delta = results["D"]["test_f1_macro"] - results["C"]["test_f1_macro"] if "D" in results else None
 
     st.markdown("<h3 style='margin-top:1.5rem'>Interpretation</h3>", unsafe_allow_html=True)
-    nlp_effect = "improves" if nlp_delta > 0 else "changes"
-
-    analyst_para = ""
-    if analyst_delta is not None:
-        analyst_effect = "improves" if analyst_delta > 0 else "leaves"
-        analyst_para = (
-            f'<p><b style="color:#f59e0b">Analyst correction contribution ({analyst_delta:+.4f} F1):</b> '
-            f'Config D re-trains on the same 66 features as Config C, but with corrected analyst data '
-            f'(previously all-zero due to a <code>NameError</code> in the batch pipeline). '
-            f'The corrected analyst consensus, upgrade score, coverage count, price-target upside, '
-            f'and sentiment momentum {analyst_effect} Test F1 from '
-            f'{results["C"]["test_f1_macro"]:.4f} to {results["D"]["test_f1_macro"]:.4f} '
-            f'({analyst_delta:+.4f}). The near-zero delta confirms that analyst ratings, '
-            f'while conceptually valuable, are largely priced in at the 5-day horizon — '
-            f'consistent with the semi-strong form of the EMH. The corrected pipeline also '
-            f'provides a clean data quality baseline for future work.</p>'
-        )
+    analyst_text = (
+        f" The legacy D-minus-C delta is {analyst_delta:+.4f}, but it is not valid historical "
+        "evidence because the analyst inputs are not point-in-time."
+        if analyst_delta is not None
+        else ""
+    )
 
     st.markdown(
         f'<div class="glass-card" style="line-height:1.8;color:#94a3b8;font-size:0.9rem">'
-
-        f'<p><b style="color:#8b5cf6">NLP contribution ({nlp_delta:+.4f} F1):</b> '
-        f'Adding FinBERT + VADER sentiment features {nlp_effect} Test F1 from '
-        f'{results["A"]["test_f1_macro"]:.4f} to {results["B"]["test_f1_macro"]:.4f}. '
-        f'While the magnitude is modest, this suggests '
-        f'that financial news sentiment captures information not fully reflected in '
-        f'technical indicators. The small effect size is expected: most trading days '
-        f'rely on sector-level sentiment fallback due to sparse per-ticker news coverage '
-        f'(only ~1.5% of ticker-days have direct headlines).</p>'
-
-        f'<p><b style="color:#f97316">CV contribution ({cv_delta:+.4f} F1):</b> '
-        f'Adding EfficientNet-B0 chart embeddings shows a marginal '
-        f'{"improvement" if cv_delta > 0 else "decrease"} '
-        f'({cv_delta:+.4f}). The CNN embeddings encode visual price patterns '
-        f'(trends, reversals, consolidation) but overlap significantly with the '
-        f'technical indicators already in the feature set (RSI, MACD, Bollinger Bands). '
-        f'This confirms that much of the "visual" information in candlestick charts '
-        f'is already captured by numerical indicators.</p>'
-
-        f'{analyst_para}'
-
-        f'<p><b style="color:#60a5fa">Market efficiency implication:</b> '
-        f'The overall F1 of ~0.50 for 5-day binary prediction is consistent with '
-        f'the semi-strong form of the Efficient Market Hypothesis -- public information '
-        f'(technical indicators, news) provides limited but non-zero predictive signal '
-        f'at the weekly horizon. The marginal NLP contribution suggests markets are '
-        f'not perfectly efficient at incorporating news sentiment in the short term.</p>'
-
+        f'<p><b style="color:#8b5cf6">Legacy deltas:</b> B-minus-A is {nlp_delta:+.4f} F1 '
+        f'and C-minus-B is {cv_delta:+.4f} F1. B and C included contaminated analyst columns '
+        f'and were not run with the release protocol, so neither delta supports a modality claim.'
+        f'{analyst_text}</p>'
+        f'<p><b style="color:#60a5fa">Audited result:</b> The separate purged rerun found '
+        f'Market-only F1 0.4918 and Market + NLP F1 0.4887. It does not demonstrate '
+        f'robust directional value, an NLP improvement, or the Efficient Market Hypothesis.</p>'
         f'<p><b style="color:#94a3b8">Stacking ensemble caveat:</b> '
-        f'The StackingClassifier underperforms individual models because scikit-learn\'s '
-        f'implementation uses KFold (not TimeSeriesSplit) internally for generating '
-        f'meta-features. This causes temporal data leakage during the stacking cross-validation, '
-        f'degrading out-of-sample performance. The ablation correctly picks the best '
-        f'individual model (RF or LightGBM) per config.</p>'
-
+        f'The legacy helper uses internal KFold meta-feature generation, which is inappropriate '
+        f'for this temporal panel. Stacking is excluded from the audited rerun.</p>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -569,7 +537,7 @@ def render() -> None:
     # -- Disclaimer -----------------------------------------------------------
     st.markdown(
         "<p class='disclaimer'>"
-        "All evaluations use a strict temporal split with no data leakage. "
-        "Past performance does not predict future returns.</p>",
+        "Legacy diagnostics are shown for transparency. Only the documented A/B rerun uses "
+        "the revised purged protocol. Past performance does not predict future returns.</p>",
         unsafe_allow_html=True,
     )

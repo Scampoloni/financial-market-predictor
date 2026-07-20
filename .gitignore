@@ -28,7 +28,11 @@ ENV/
 data/raw/**
 !data/raw/**/
 !data/raw/**/.gitkeep
+data/raw_full/
 data/cache/
+
+# Streamlit
+.streamlit/secrets.toml
 
 # Model artifacts — committed directly (all files <50 MB)
 # models/*.pkl

@@ -18,13 +18,9 @@
 
 ## Demo status
 
-The Streamlit application is an educational interface for inspecting legacy experimental artefacts and generating an **experimental direction estimate** from live market inputs. Its model confidence is not calibrated and must not be used for decisions. The separate news Q&A feature searches the bundled headline index; public demo mode does not fetch live news or call a paid LLM API.
+The Streamlit application is an educational interface for inspecting legacy experimental artefacts and generating an **experimental direction estimate** from live market inputs. Its model score is not calibrated and must not be used for decisions. The separate news Q&A feature searches the bundled headline index; public demo mode does not fetch live news or call a paid LLM API.
 
-The historic deployment link is [financial-market-predictorr.streamlit.app](https://financial-market-predictorr.streamlit.app/). Verify it manually before linking it from a CV: deployment state and artefact freshness can change independently of this repository.
-
-| Estimate interface | Analysis interface | NLP/CV interface |
-| :---: | :---: | :---: |
-| ![Estimate interface](docs/screenshots/01_prediction_flow.png) | ![Analysis interface](docs/screenshots/02_model_analysis.png) | ![NLP/CV interface](docs/screenshots/03_nlp_cv_integration.png) |
+The deployment URL is [financial-market-predictorr.streamlit.app](https://financial-market-predictorr.streamlit.app/). Before linking it from a CV, configure the deployment to use `main` and Python 3.13, then verify the rendered app. Deployment state and artefact freshness can change independently of this repository.
 
 ## System overview
 
@@ -86,8 +82,8 @@ The existing `data/processed/ablation_results.json` contains the following 5-day
 | --- | --- | ---: | --- |
 | A | Market only | 0.4970 | Superseded by the audited A rerun above. |
 | B | Market + NLP + analyst | 0.4826 | Superseded; the legacy B definition improperly included analyst columns. |
-| C | Market + NLP + CV | 0.4861 | Below A in this legacy run; rerun required. |
-| D | C + analyst | 0.4850 | Methodologically invalid for historical reporting because aggregate analyst data is current. |
+| C | Market + NLP + CV + analyst | 0.4861 | Legacy analyst contamination; audited C rerun required. |
+| D | Same 66 columns with rebuilt analyst data | 0.4850 | Methodologically invalid for historical reporting because aggregate analyst data is current. |
 
 The observed pattern is consistent with the difficulty of extracting short-horizon signals from public data. It does not establish profitability, alpha, a universal performance ceiling, market efficiency, or the usefulness of a modality.
 
@@ -111,6 +107,7 @@ FinBERT is implemented as a feature pipeline. Candlestick images and EfficientNe
 ### Lightweight inspection
 
 The tracked artefacts and tests support local inspection without downloading data or calling external APIs.
+Use Python 3.13; this is the version verified by the pinned environment and CI.
 
 ```powershell
 python -m venv .venv
@@ -189,4 +186,4 @@ This project was developed as an AI-assisted learning and research project. Mode
 
 ## Publication checklist
 
-Before pinning or linking this project publicly: verify the live deployment, review model-artefact storage and data rights, choose a licence with the owner, and update the repository description/topics in GitHub. Do not claim price prediction, trading performance, Gemini integration, or clean out-of-sample validation beyond the documented audited A/B evaluation.
+Before pinning or linking this project publicly: set GitHub's default branch to `main`, configure the Streamlit deployment for `main` and Python 3.13, verify the live deployment, review model-artefact storage and data rights, choose a licence with the owner, and update the repository description/topics in GitHub. Do not claim price prediction, trading performance, Gemini integration, or clean out-of-sample validation beyond the documented audited A/B evaluation.

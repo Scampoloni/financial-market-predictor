@@ -2,18 +2,19 @@
 train_ml.py — Train all ML models and run the full ablation study.
 
 Ablation configurations:
-  Config A: market features only                              (baseline)
+  Config A: market features only
   Config B: market + NLP features
-  Config C: market + NLP + CV features                       (full model, analyst data was zero)
-  Config D: market + NLP + CV + analyst (corrected)          (same 66 features as C, correct data)
+  Config C: market + NLP + CV features
+  Config D: market + NLP + CV + current aggregate analyst data (exploratory only)
 
-Config D was added after a data-pipeline bug was fixed in build_analyst_features.py.
-In the original A/B/C runs, features_analyst.parquet contained all-zero analyst values
-(rec_agg NameError silently caught). Config D re-runs Config C with the corrected parquet
-to quantify the marginal value of analyst consensus, coverage and momentum.
+Current provider analyst aggregates are not point-in-time historical data. They are
+isolated to Config D and must not be used for valid historical reporting.
 
-Models: RandomForest, LightGBM (Optuna-tuned), Stacking ensemble.
-Each config is evaluated on the held-out test set (2025).
+Valid ablations use RandomForest and Optuna-tuned LightGBM. The legacy stacking
+helper remains for compatibility but is excluded from ``run_ablation`` because its
+internal KFold is inappropriate for the temporal panel. Models are selected by
+validation macro F1 before the reporting partition is evaluated. The reporting
+period was inspected during development and is not a single-use final test.
 
 Usage:
     python -m src.models.train_ml              # valid ablation candidates (A, B, C)
