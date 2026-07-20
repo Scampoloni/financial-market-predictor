@@ -58,12 +58,12 @@ def _feat_direction(name: str, value: float) -> tuple[str, str]:
 
 
 def _signal_strength(conf: float) -> tuple[str, str]:
-    """Return (label, color) for confidence threshold."""
+    """Return a restrained display label for an uncalibrated model score."""
     if conf >= 0.65:
-        return "Strong Signal", _UP_COLOR
+        return "Higher model confidence", _UP_COLOR
     if conf >= 0.55:
-        return "Moderate Signal", "#3b82f6"
-    return "Uncertain Signal", _AMBER
+        return "Moderate model confidence", "#3b82f6"
+    return "Low model confidence", _AMBER
 
 
 # ── News relevance filter ────────────────────────────────────────────────────
@@ -422,12 +422,12 @@ def _render_prediction_card(result: dict) -> None:
     st.markdown(
         f'<div class="pred-card {card_class}">'
         f'<div style="font-size:0.8rem;color:{_MUTED};font-weight:600;text-transform:uppercase;'
-        f'letter-spacing:0.05em;margin-bottom:8px">{horizon}-Day Forecast</div>'
+        f'letter-spacing:0.05em;margin-bottom:8px">{horizon}-Day Experimental Direction Estimate</div>'
         f'<div style="font-size:3rem;line-height:1;margin:4px 0">{arrow}</div>'
         f'<div style="font-size:1.8rem;font-weight:800;color:{color};margin:4px 0;'
         f'letter-spacing:-0.02em">{pred}</div>'
         f'<div style="color:{_MUTED};font-size:0.88rem">'
-        f'Confidence: <b style="color:{color}">{conf:.0%}</b>'
+        f'Model confidence (not calibrated): <b style="color:{color}">{conf:.0%}</b>'
         f' &nbsp;·&nbsp; <span style="color:{baseline_color};font-size:0.82rem">'
         f'{baseline_delta:+.1f} pp vs 50% baseline</span></div>'
         f'<div style="margin:8px 0 4px"><span style="background:{signal_color}18;color:{signal_color};'

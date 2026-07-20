@@ -28,6 +28,7 @@ ENV/
 data/raw/**
 !data/raw/**/
 !data/raw/**/.gitkeep
+data/cache/
 
 # Model artifacts — committed directly (all files <50 MB)
 # models/*.pkl
