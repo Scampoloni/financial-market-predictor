@@ -10,7 +10,7 @@
 
 | Question | What was investigated |
 | --- | --- |
-| Research question | Do public market, headline-sentiment, and chart-image features improve 5- or 21-trading-day direction classification? |
+| Research question | Do public market, headline-sentiment, and chart-image features improve 5- or 21-trading-day direction classification? The 5-day A/B comparison is audited; 21-day and CV results remain exploratory. |
 | Universe | 67 large-cap US equities across seven sectors, plus market context data |
 | Core workflow | Collect -> engineer features -> temporally validate -> compare feature blocks -> serve an educational demo |
 | Primary metric | Macro F1, supported by accuracy and per-class precision/recall |
@@ -75,7 +75,10 @@ For context, the majority-class baseline scored 0.3506 macro F1 because the repo
 
 These results do not support a claim that the NLP block adds predictive value. They are consistent with the difficulty of extracting public-data signals at this horizon, but do not prove market efficiency or absence of any signal.
 
-## Legacy results: diagnostic only
+<details>
+<summary><strong>Legacy results: diagnostic only</strong></summary>
+
+<br>
 
 The existing `data/processed/ablation_results.json` contains the following 5-day diagnostic outputs. They are shown for transparency, not as validated performance claims.
 
@@ -87,6 +90,8 @@ The existing `data/processed/ablation_results.json` contains the following 5-day
 | D | C + analyst | 0.4850 | Methodologically invalid for historical reporting because aggregate analyst data is current. |
 
 The observed pattern is consistent with the difficulty of extracting short-horizon signals from public data. It does not establish profitability, alpha, a universal performance ceiling, market efficiency, or the usefulness of a modality.
+
+</details>
 
 ## Architecture and technologies
 
@@ -132,6 +137,16 @@ python -m src.models.train_ml
 
 Before a final rerun, exclude analyst features until a licensed point-in-time source is available. See [reproducibility.md](docs/reproducibility.md).
 
+### Audited A/B rerun
+
+To reproduce the reported A/B evaluation from the tracked, hashed feature snapshots (without rebuilding raw data or CV embeddings), run:
+
+```powershell
+python -m scripts.rerun_purged_ab --trials 40
+```
+
+This takes roughly 25 minutes on the development machine. The stored predictions independently reproduce the reported metrics; external data and Optuna search can still make a full end-to-end rebuild non-byte-identical.
+
 ## Quality checks
 
 - Unit tests cover feature contracts, target construction, split boundaries, model bundles, NLP/CV schemas, and app bootstrap.
@@ -152,7 +167,7 @@ notebooks/              Exploratory development record (may differ from the revi
 
 ## Important limitations
 
-- Stored metrics require regeneration with the revised purge and reporting-period controls.
+- The audited A/B metrics use the revised purge and reporting-period controls; C and all legacy artefacts still require the same rerun before they can be treated as valid reporting results.
 - Current analyst aggregate data is not point-in-time and is not valid for historical model results.
 - News timestamps are normalised to UTC calendar dates; session-close, after-hours, holiday, and source-timezone alignment require a market-calendar-aware redesign before strong timing claims.
 - Fallback sentiment primarily improves completeness, not direct ticker-news coverage.
@@ -174,4 +189,4 @@ This project was developed as an AI-assisted learning and research project. Mode
 
 ## Publication checklist
 
-Before pinning or linking this project publicly: regenerate valid metrics, verify the live deployment, review model-artefact storage and data rights, choose a licence with the owner, and update the repository description/topics in GitHub. Do not claim price prediction, trading performance, Gemini integration, or clean out-of-sample validation until the documented manual actions are complete.
+Before pinning or linking this project publicly: verify the live deployment, review model-artefact storage and data rights, choose a licence with the owner, and update the repository description/topics in GitHub. Do not claim price prediction, trading performance, Gemini integration, or clean out-of-sample validation beyond the documented audited A/B evaluation.
