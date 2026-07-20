@@ -25,6 +25,7 @@ from src.config import (
     PCA_CV_PATH,
     PCA_NLP_PATH,
     STACKING_MODEL_PATH,
+    TICKER_SECTOR_MAP,
 )
 
 logger = logging.getLogger(__name__)
@@ -372,6 +373,14 @@ class LivePredictor:
         if analyst_feat is not None:
             parts.append(analyst_feat)
         all_feat = pd.concat(parts)
+
+        # Training one-hot encodes the sector column. Live market features retain
+        # the string label, so restore the matching dummy explicitly before the
+        # model bundle's saved feature order is applied.
+        sector_col = f"sector_{TICKER_SECTOR_MAP.get(ticker, '')}"
+        if sector_col in feature_cols:
+            all_feat[sector_col] = 1.0
+
         feature_vec = (
             pd.DataFrame([all_feat])
             .reindex(columns=feature_cols, fill_value=0)

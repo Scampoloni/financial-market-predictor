@@ -249,7 +249,7 @@ hr { border-color: #1e293b !important; margin: 1rem 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-from src.app.pages import predictor, about, model_analysis, rag_chat
+from src.app.pages import predictor, about, model_analysis, rag_chat, eda_explorer
 
 # ── Branding ─────────────────────────────────────────────────────────────────
 st.markdown(
@@ -258,8 +258,8 @@ st.markdown(
 )
 
 # ── Navigation via native Streamlit tabs ─────────────────────────────────────
-tab_pred, tab_compare, tab_analysis, tab_chat, tab_about = st.tabs(
-    ["Prediction", "Compare", "Analysis", "News Chat", "About"]
+tab_pred, tab_compare, tab_analysis, tab_eda, tab_chat, tab_about = st.tabs(
+    ["Prediction", "Compare", "Analysis", "EDA", "News Chat", "About"]
 )
 
 with tab_pred:
@@ -268,6 +268,8 @@ with tab_compare:
     predictor.render_compare()
 with tab_analysis:
     model_analysis.render()
+with tab_eda:
+    eda_explorer.render()
 with tab_chat:
     rag_chat.render()
 with tab_about:

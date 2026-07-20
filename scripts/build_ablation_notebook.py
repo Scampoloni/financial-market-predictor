@@ -44,9 +44,9 @@ Full evaluation of the four-config ablation study results.
 
 **Configs:**
 - **A**: Market features only (28 features) — baseline
-- **B**: Market + NLP sentiment (56 features)
-- **C**: Market + NLP + CV chart embeddings (66 features)
-- **D**: Market + NLP + CV + Analyst ✓ (66 features, corrected analyst data)
+- **B**: Market + NLP + analyst contamination (56 legacy features)
+- **C**: Market + NLP + CV + analyst contamination (66 legacy features)
+- **D**: Same 66 columns with rebuilt current aggregate analyst data (invalid historically)
 
 Config D re-runs Config C after fixing a `NameError` in `build_analyst_features.py`
 that silently zeroed all analyst features in earlier runs.

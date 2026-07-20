@@ -39,6 +39,14 @@ _ROOT = Path(__file__).resolve().parents[2]
 _NEWS_DIR     = _ROOT / "data" / "raw" / "news"
 _INDEX_CACHE  = _ROOT / "data" / "processed" / "rag_index.pkl"
 
+# ── Model names (use config constants so there is one source of truth) ────────
+import sys as _sys
+_sys.path.insert(0, str(_ROOT))
+try:
+    from src.config import CLAUDE_MODEL_NAME as _CLAUDE_MODEL_NAME
+except ImportError:
+    _CLAUDE_MODEL_NAME = "claude-3-5-haiku-latest"
+
 # ── Embedding model ───────────────────────────────────────────────────────────
 _EMBED_MODEL_NAME = "all-MiniLM-L6-v2"   # 22M params, CPU-friendly, 384-dim
 
@@ -306,7 +314,7 @@ class FinancialRAG:
 
                 client = anthropic.Anthropic(api_key=claude_key)
                 response = client.messages.create(
-                    model="claude-3-5-haiku-latest",
+                    model=_CLAUDE_MODEL_NAME,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}],
                     max_tokens=300,
@@ -318,11 +326,19 @@ class FinancialRAG:
             except Exception as exc:
                 logger.warning("Claude API error: %s", exc)
 
-        # Try OpenAI fallback
+        # Try OpenAI fallback (optional — requires: pip install openai)
         openai_key = os.getenv("OPENAI_API_KEY")
         if openai_key:
             try:
-                import openai
+                import openai  # optional dependency; not required when only Claude is used
+            except ImportError:
+                logger.warning(
+                    "openai package not installed. "
+                    "Install with: pip install openai>=1.0.0"
+                )
+                openai_key = None  # skip fallback
+        if openai_key:
+            try:
                 client = openai.OpenAI(api_key=openai_key)
                 resp = client.chat.completions.create(
                     model="gpt-4o-mini",

@@ -1,4 +1,4 @@
-# Exact pinned versions verified 2026-05-23 on Python 3.10 (Windows 11)
+# Exact pinned versions verified 2026-07-20 on Python 3.13 (Windows 11)
 # Use requirements.txt for flexible installs; this file for exact reproducibility.
 # To install: pip install -r requirements-pinned.txt
 #
@@ -15,11 +15,15 @@ transformers==5.4.0
 torch==2.11.0
 torchvision==0.26.0
 mplfinance==0.12.10b0
+matplotlib==3.10.8
+seaborn==0.13.2
+requests==2.32.3
 nltk==3.9.4
 shap==0.51.0
 plotly==6.6.0
 streamlit==1.55.0
 pytest==9.0.2
+pytest-cov==6.1.0
 ruff==0.11.13
 python-dotenv==1.2.2
 feedparser==6.0.12

@@ -20,13 +20,13 @@ def render() -> None:
     )
     st.markdown(
         '<div class="glass-card" style="line-height:1.7;color:#94a3b8;font-size:0.92rem">'
-        "<b style='color:#f0f6fc'>Scientific question:</b> Can publicly available market data, "
-        "financial news sentiment, and candlestick chart patterns predict short-term stock price "
-        "direction better than a random baseline?<br><br>"
+        "<b style='color:#f0f6fc'>Scientific question:</b> Do publicly available market data, "
+        "financial-news sentiment, and candlestick-chart features improve short-horizon direction "
+        "classification? The audited A/B result did not demonstrate robust value.<br><br>"
         "I approach this as a binary classification problem — predicting whether a stock's "
         "closing price will be <b style='color:#10b981'>UP</b> or "
         "<b style='color:#ef4444'>DOWN</b> over 5- and 21-trading-day horizons — using a "
-        "temporal train/validation/test split to prevent data leakage."
+        "temporal train/validation/reporting design."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -57,7 +57,7 @@ def render() -> None:
             '<div style="font-size:1.6rem;margin-bottom:6px">📰</div>'
             '<div style="font-weight:700;color:#f59e0b;font-size:1rem;margin-bottom:8px">Block 2: NLP</div>'
             '<div style="color:#94a3b8;font-size:0.85rem;line-height:1.6">'
-            'FinBERT + VADER on <b style="color:#e2e8f0">8,552 news headlines</b><br>'
+            'FinBERT + VADER on <b style="color:#e2e8f0">~6,100 news headlines</b><br>'
             '<span style="color:#475569">Sentiment score, momentum, surprise, dispersion, '
             'news volume z-score, sector fallback. '
             'RAG chatbot for interactive Q&amp;A.</span><br><br>'
@@ -86,8 +86,8 @@ def render() -> None:
                 unsafe_allow_html=True)
 
     rows = [
-        ("#10b981", "Yahoo Finance",    "5yr daily OHLCV for 67 S&P 500 tickers (2020–2026), ~550k rows"),
-        ("#f59e0b", "Financial News",   "RSS feeds (Reuters, MarketWatch) + yfinance news API, 8,552 headlines"),
+        ("#10b981", "Yahoo Finance",    "6yr daily OHLCV for 67 S&P 500 tickers (2020–2026), ~101k rows"),
+        ("#f59e0b", "Financial News",   "RSS feeds (Reuters, MarketWatch) + yfinance news API, ~6,100 headlines"),
         ("#60a5fa", "Candlestick Charts","61,640+ images generated via mplfinance (30-day windows, step=2)"),
         ("#8b5cf6", "Pre-trained Models","ProsusAI/finbert (HuggingFace) · EfficientNet-B0 (torchvision ImageNet)"),
     ]
@@ -118,9 +118,9 @@ def render() -> None:
             '<div style="color:#94a3b8;font-size:0.85rem;line-height:1.7">'
             '<b style="color:#e2e8f0">Train:</b> 2020–2024 H1<br>'
             '<b style="color:#e2e8f0">Validation:</b> 2024 H2<br>'
-            '<b style="color:#e2e8f0">Test:</b> 2025 (held-out)<br><br>'
-            'TimeSeriesSplit (5-fold) for cross-validation. '
-            'No future data ever seen during training.'
+            '<b style="color:#e2e8f0">Reporting:</b> 2025 onward<br><br>'
+            'The audited A/B rerun uses date-grouped purged cross-validation. '
+            'The reporting period was inspected during development and is not a single-use final test.'
             '</div></div>',
             unsafe_allow_html=True,
         )
@@ -132,11 +132,10 @@ def render() -> None:
             'Ablation Study Design</div>'
             '<div style="color:#94a3b8;font-size:0.85rem;line-height:1.7">'
             '<b style="color:#94a3b8">Config A:</b> Market features only (baseline)<br>'
-            '<b style="color:#8b5cf6">Config B:</b> + NLP sentiment features<br>'
-            '<b style="color:#10b981">Config C:</b> + CV chart embeddings<br>'
-            '<b style="color:#f59e0b">Config D:</b> + Analyst data (corrected pipeline)<br><br>'
-            'Binary classification: UP/DOWN direction more actionable '
-            'and class-balanced than a continuous return target.'
+            '<b style="color:#8b5cf6">Config B:</b> + NLP sentiment features (audited)<br>'
+            '<b style="color:#10b981">Config C:</b> + CV chart embeddings (legacy diagnostic)<br>'
+            '<b style="color:#f59e0b">Config D:</b> + non-point-in-time analyst data (invalid historically)<br><br>'
+            'Binary classification: UP/DOWN direction with macro F1 as the primary metric.'
             '</div></div>',
             unsafe_allow_html=True,
         )
@@ -160,16 +159,16 @@ def render() -> None:
         ("VIX Level", "CBOE fear gauge. >25 = fear; <18 = complacency."),
         ("Return 1D / 5D / 20D", "Price return over 1-, 5-, and 20-day horizons."),
         ("Price/SMA20 & Price/SMA50", "Distance of price from 20- and 50-day moving averages."),
-        ("Sector Dummies", "One-hot encoding of the GICS sector (11 total)."),
+        ("Sector Dummies", "One-hot encoding of 7 sectors (Tech, Finance, Insurance, Healthcare, Consumer, Energy, Industrial)."),
     ]
     _NLP_FEATURES = [
         ("FinBERT Sentiment", "Finance-domain BERT (ProsusAI/finbert). Score: -1 (negative) to +1 (positive)."),
         ("VADER Compound", "Rule-based sentiment. Fast, no GPU required. Used as second NLP signal."),
-        ("Sentiment Momentum", "3-day rolling mean. Trend in news tone is more predictive than absolute level."),
+        ("Sentiment Momentum", "Recent change in news tone; predictive value was not demonstrated in the audited A/B rerun."),
         ("Sentiment Surprise (Z-score)", "Deviation from 20-day mean. A sudden shift signals new information."),
         ("Sentiment × Volume", "Interaction term: high-volume negative news amplifies the bearish signal."),
         ("Sentiment Dispersion", "Disagreement across headlines. High = uncertain market narrative."),
-        ("News Volume Z-score", "Spike in headline count — may precede market-moving events."),
+        ("News Volume Z-score", "Standardised headline-count deviation from recent history."),
         ("Sector / Market Fallback", "Sector- or market-wide sentiment used when ticker has no direct coverage (>99% of days)."),
     ]
     _CV_FEATURES = [
@@ -191,7 +190,7 @@ def render() -> None:
     with st.expander("📊 Market Block — 28 features", expanded=False):
         _glossary_rows(_MARKET_FEATURES, "#4a90d9")
 
-    with st.expander("📰 NLP Block — 28 features", expanded=False):
+    with st.expander("📰 NLP Block — 23 features", expanded=False):
         _glossary_rows(_NLP_FEATURES, "#8b5cf6")
 
     with st.expander("📈 CV Block — 10 features", expanded=False):

@@ -24,7 +24,7 @@ import lightgbm as lgb
 import optuna
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, accuracy_score, classification_report
-from sklearn.model_selection import TimeSeriesSplit, cross_validate, cross_val_score
+from sklearn.model_selection import cross_validate, cross_val_score
 
 from src.config import (
     CV_FOLDS,
@@ -35,11 +35,14 @@ from src.config import (
     MODEL_21D_PATH,
     MODELS_DIR,
     RAW_MARKET_DIR,
+    TARGET_HORIZON_DAYS_LONG,
     TEST_START,
+    TEST_END,
     TRAIN_END,
     VAL_END,
     VAL_START,
 )
+from src.models.splits import PurgedDateTimeSeriesSplit
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,7 +53,7 @@ logger = logging.getLogger(__name__)
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-HORIZON = 21
+HORIZON = TARGET_HORIZON_DAYS_LONG   # 21 trading days (~1 month), from config
 _EXCLUDE = {"ticker", "target", "close", "vix_regime", "rsi_zone",
             "vader_label", "finbert_label", "chart_available"}
 
@@ -214,9 +217,10 @@ def main():
     feature_cols = [c for c in df.columns
                     if c not in _EXCLUDE and not c.startswith("Unnamed")]
 
-    train = df[df.index <= TRAIN_END]
-    val   = df[(df.index >= VAL_START) & (df.index <= VAL_END)]
-    test  = df[df.index >= TEST_START]
+    horizon = pd.offsets.BDay(HORIZON)
+    train = df[df.index <= pd.Timestamp(TRAIN_END) - horizon]
+    val = df[(df.index >= VAL_START) & (df.index <= pd.Timestamp(VAL_END) - horizon)]
+    test = df[(df.index >= TEST_START) & (df.index <= pd.Timestamp(TEST_END) - horizon)]
 
     X_train, y_train = train[feature_cols].fillna(0), train["target"]
     X_val,   y_val   = val[feature_cols].fillna(0),   val["target"]
@@ -227,7 +231,7 @@ def main():
         len(feature_cols), len(X_train), len(X_val), len(X_test),
     )
 
-    tscv = TimeSeriesSplit(n_splits=CV_FOLDS)
+    tscv = PurgedDateTimeSeriesSplit(n_splits=CV_FOLDS, embargo_days=HORIZON)
     results = {}
 
     # ── RandomForest ──────────────────────────────────────────────────────────

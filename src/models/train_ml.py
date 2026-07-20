@@ -2,21 +2,22 @@
 train_ml.py — Train all ML models and run the full ablation study.
 
 Ablation configurations:
-  Config A: market features only                              (baseline)
+  Config A: market features only
   Config B: market + NLP features
-  Config C: market + NLP + CV features                       (full model, analyst data was zero)
-  Config D: market + NLP + CV + analyst (corrected)          (same 66 features as C, correct data)
+  Config C: market + NLP + CV features
+  Config D: market + NLP + CV + current aggregate analyst data (exploratory only)
 
-Config D was added after a data-pipeline bug was fixed in build_analyst_features.py.
-In the original A/B/C runs, features_analyst.parquet contained all-zero analyst values
-(rec_agg NameError silently caught). Config D re-runs Config C with the corrected parquet
-to quantify the marginal value of analyst consensus, coverage and momentum.
+Current provider analyst aggregates are not point-in-time historical data. They are
+isolated to Config D and must not be used for valid historical reporting.
 
-Models: RandomForest, LightGBM (Optuna-tuned), Stacking ensemble.
-Each config is evaluated on the held-out test set (2025).
+Valid ablations use RandomForest and Optuna-tuned LightGBM. The legacy stacking
+helper remains for compatibility but is excluded from ``run_ablation`` because its
+internal KFold is inappropriate for the temporal panel. Models are selected by
+validation macro F1 before the reporting partition is evaluated. The reporting
+period was inspected during development and is not a single-use final test.
 
 Usage:
-    python -m src.models.train_ml              # full ablation (A, B, C, D)
+    python -m src.models.train_ml              # valid ablation candidates (A, B, C)
     python -m src.models.train_ml --config A   # single config
     python -m src.models.train_ml --config D   # Config D only
 """
@@ -29,7 +30,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, accuracy_score, classification_report
-from sklearn.model_selection import TimeSeriesSplit, cross_validate, cross_val_score
+from sklearn.model_selection import cross_validate, cross_val_score
 import xgboost as xgb
 import lightgbm as lgb
 import optuna
@@ -44,11 +45,14 @@ from src.config import (
     PROCESSED_DIR,
     STACKING_MODEL_PATH,
     TARGET_CLASSES,
+    TARGET_HORIZON_DAYS,
+    TEST_END,
     TEST_START,
     TRAIN_END,
     VAL_END,
     VAL_START,
 )
+from src.models.splits import PurgedDateTimeSeriesSplit
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -78,13 +82,9 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
     Args:
         config: One of:
           'A' — market features only (28 features)
-          'B' — market + NLP + analyst (56 features; analyst was zero in original run)
-          'C' — market + NLP + CV + analyst (66 features; analyst was zero in original run)
-          'D' — market + NLP + CV + analyst (66 features; CORRECTED analyst parquet)
-
-        Config D uses the same feature columns as C.  The distinction is purely in
-        training data: D is run after the build_analyst_features.py bug-fix, so analyst
-        features carry real non-zero values.
+          'B' — market + NLP
+          'C' — market + NLP + CV
+          'D' — market + NLP + CV + analyst (exploratory only)
 
     Returns:
         Combined DataFrame with DatetimeIndex, sorted by date.
@@ -97,8 +97,7 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
     if config == "A":
         return market.sort_index()
 
-    # Config D follows the same code path as C — same feature columns,
-    # different training data (corrected analyst parquet).
+    # D adds analyst data to the otherwise market + NLP + CV configuration.
     effective_config = "C" if config == "D" else config
 
     market_mi = market.set_index("ticker", append=True)
@@ -113,8 +112,10 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
     combined_mi = market_mi.join(nlp_mi, how="left")
     combined_mi[nlp_cols] = combined_mi[nlp_cols].fillna(0)
 
-    # Join analyst features (part of NLP block) if available
-    if FEATURES_ANALYST_PATH.exists():
+    # Analyst data is intentionally isolated to D. Current aggregate provider
+    # values are not validated point-in-time historical observations, so A-C
+    # must remain free of this exploratory block.
+    if config == "D" and FEATURES_ANALYST_PATH.exists():
         logger.info("Loading analyst features ...")
         analyst = pd.read_parquet(FEATURES_ANALYST_PATH)
         analyst.index = pd.to_datetime(analyst.index)
@@ -143,10 +144,11 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
 
 
 def _temporal_split(df: pd.DataFrame, feature_cols: list[str]):
-    """Split into train/val/test preserving temporal order."""
-    train = df[df.index <= TRAIN_END]
-    val   = df[(df.index >= VAL_START) & (df.index <= VAL_END)]
-    test  = df[df.index >= TEST_START]
+    """Create purged train/validation/test partitions for forward-return labels."""
+    horizon = pd.offsets.BDay(TARGET_HORIZON_DAYS)
+    train = df[df.index <= pd.Timestamp(TRAIN_END) - horizon]
+    val = df[(df.index >= VAL_START) & (df.index <= pd.Timestamp(VAL_END) - horizon)]
+    test = df[(df.index >= TEST_START) & (df.index <= pd.Timestamp(TEST_END) - horizon)]
 
     def xy(d):
         return d[feature_cols].fillna(0), d["target"]
@@ -161,7 +163,7 @@ def _temporal_split(df: pd.DataFrame, feature_cols: list[str]):
 def train_random_forest(
     X_train: pd.DataFrame,
     y_train: pd.Series,
-    tscv: TimeSeriesSplit,
+    tscv: PurgedDateTimeSeriesSplit,
 ) -> tuple[RandomForestClassifier, dict]:
     """Train RandomForest with TimeSeriesSplit CV."""
     model = RandomForestClassifier(
@@ -191,7 +193,7 @@ def train_random_forest(
 def _optuna_lgb(
     X_train: pd.DataFrame,
     y_train: pd.Series,
-    tscv: TimeSeriesSplit,
+    tscv: PurgedDateTimeSeriesSplit,
     n_trials: int = 40,
 ) -> dict:
     """Run Optuna to find best LightGBM hyperparameters."""
@@ -223,7 +225,7 @@ def _optuna_lgb(
 def train_lightgbm(
     X_train: pd.DataFrame,
     y_train: pd.Series,
-    tscv: TimeSeriesSplit,
+    tscv: PurgedDateTimeSeriesSplit,
     n_trials: int = 40,
 ) -> tuple[lgb.LGBMClassifier, dict]:
     """Train LightGBM with Optuna-tuned hyperparameters."""
@@ -253,16 +255,16 @@ def train_lightgbm(
 def train_stacking(
     X_train: pd.DataFrame,
     y_train: pd.Series,
-    tscv: TimeSeriesSplit,
+    tscv: PurgedDateTimeSeriesSplit,
     lgb_params: dict | None = None,
     X_val: pd.DataFrame | None = None,
     y_val: pd.Series | None = None,
 ) -> tuple[StackingClassifier, dict]:
     """Train Stacking ensemble (RF + XGB + LGB → LogisticRegression meta).
 
-    Uses cv=5 (KFold) internally for stacking cross-val predictions,
-    since TimeSeriesSplit doesn't produce full partitions required by
-    StackingClassifier. External evaluation still uses tscv.
+    This legacy helper uses KFold internally because ``StackingClassifier``
+    requires complete cross-validation partitions. It is intentionally not
+    used by ``run_ablation``: KFold is not valid for this temporal panel.
 
     cv_f1_mean is reported as the validation-set F1 (when X_val/y_val are
     provided) rather than a training-set proxy, so it is comparable to the
@@ -371,17 +373,19 @@ def evaluate_model(
 # Ablation study
 # ──────────────────────────────────────────────────────────────────────────────
 
-def run_ablation(configs: list[str] = ("A", "B", "C", "D")) -> dict:
+def run_ablation(configs: list[str] = ("A", "B", "C")) -> dict:
     """Run the full ablation study with multiple models per config.
 
-    Trains RF, LightGBM (Optuna-tuned), and Stacking on each config.
+    Trains RF and LightGBM (Optuna-tuned) on each config.
     Picks the best model per config for the final ablation table.
     Saves Config C best model as the production model.
 
     Returns:
         Dict with results per config (including per-model breakdown).
     """
-    tscv = TimeSeriesSplit(n_splits=CV_FOLDS)
+    tscv = PurgedDateTimeSeriesSplit(
+        n_splits=CV_FOLDS, embargo_days=TARGET_HORIZON_DAYS
+    )
     results = {}
 
     for config in configs:
@@ -413,24 +417,9 @@ def run_ablation(configs: list[str] = ("A", "B", "C", "D")) -> dict:
         logger.info("Config %s: training LightGBM (Optuna) ...", config)
         lgb_model, lgb_cv = train_lightgbm(X_train, y_train, tscv, n_trials=40)
         lgb_val = evaluate_model(lgb_model, X_val, y_val, prefix="val")
-        lgb_params = lgb_cv.pop("best_params", {})
+        lgb_cv.pop("best_params", None)
         model_results["LightGBM"] = {**lgb_cv, **lgb_val, "_model": lgb_model}
         logger.info("  LGB — CV F1: %.4f | Val F1: %.4f", lgb_cv["cv_f1_mean"], lgb_val["val_f1_macro"])
-
-        # 3) Stacking (RF + XGB + LGB)
-        logger.info("Config %s: training Stacking ...", config)
-        stk_model, stk_cv = train_stacking(
-            X_train, y_train, tscv, lgb_params=lgb_params,
-            X_val=X_val, y_val=y_val,
-        )
-        stk_val = evaluate_model(stk_model, X_val, y_val, prefix="val")
-        model_results["Stacking"] = {**stk_cv, **stk_val, "_model": stk_model}
-        logger.info("  Stacking — CV F1: %.4f | Val F1: %.4f", stk_cv["cv_f1_mean"], stk_val["val_f1_macro"])
-
-        # ---- Evaluate every candidate once on test for transparent comparison ----
-        for model_name, mr in model_results.items():
-            test_metrics = evaluate_model(mr["_model"], X_test, y_test, prefix="test")
-            mr.update(test_metrics)
 
         # ---- Pick best model by validation F1 ----
         best_name = max(model_results, key=lambda k: model_results[k]["val_f1_macro"])
@@ -536,10 +525,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run ablation study")
     parser.add_argument(
         "--config", choices=["A", "B", "C", "D"],
-        help="Run single config (default: run all A, B, C, D)",
+        help="Run single config (default: run A, B, C; D is exploratory only)",
     )
     args = parser.parse_args()
 
-    configs = [args.config] if args.config else ["A", "B", "C", "D"]
+    configs = [args.config] if args.config else ["A", "B", "C"]
     results = run_ablation(configs)
     print_ablation_table(results)
