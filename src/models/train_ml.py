@@ -81,13 +81,9 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
     Args:
         config: One of:
           'A' — market features only (28 features)
-          'B' — market + NLP + analyst (56 features; analyst was zero in original run)
-          'C' — market + NLP + CV + analyst (66 features; analyst was zero in original run)
-          'D' — market + NLP + CV + analyst (66 features; CORRECTED analyst parquet)
-
-        Config D uses the same feature columns as C.  The distinction is purely in
-        training data: D is run after the build_analyst_features.py bug-fix, so analyst
-        features carry real non-zero values.
+          'B' — market + NLP
+          'C' — market + NLP + CV
+          'D' — market + NLP + CV + analyst (exploratory only)
 
     Returns:
         Combined DataFrame with DatetimeIndex, sorted by date.
@@ -100,8 +96,7 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
     if config == "A":
         return market.sort_index()
 
-    # Config D follows the same code path as C — same feature columns,
-    # different training data (corrected analyst parquet).
+    # D adds analyst data to the otherwise market + NLP + CV configuration.
     effective_config = "C" if config == "D" else config
 
     market_mi = market.set_index("ticker", append=True)
@@ -116,8 +111,10 @@ def load_combined_features(config: str = "C") -> pd.DataFrame:
     combined_mi = market_mi.join(nlp_mi, how="left")
     combined_mi[nlp_cols] = combined_mi[nlp_cols].fillna(0)
 
-    # Join analyst features (part of NLP block) if available
-    if FEATURES_ANALYST_PATH.exists():
+    # Analyst data is intentionally isolated to D. Current aggregate provider
+    # values are not validated point-in-time historical observations, so A-C
+    # must remain free of this exploratory block.
+    if config == "D" and FEATURES_ANALYST_PATH.exists():
         logger.info("Loading analyst features ...")
         analyst = pd.read_parquet(FEATURES_ANALYST_PATH)
         analyst.index = pd.to_datetime(analyst.index)
