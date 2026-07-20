@@ -6,9 +6,11 @@ on:
       - main
       - dev
       - "feature/**"
+      - "portfolio-readiness-cleanup"
   pull_request:
     branches:
       - main
+      - dev
 
 jobs:
   test:
