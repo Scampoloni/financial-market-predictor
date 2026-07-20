@@ -10,13 +10,13 @@ For each ticker and market date `t`, the target is `UP` when `close[t + h] / clo
 
 ## Partitions and validation
 
-The configured periods are training through 2024-06-30, validation in 2024H2, and reporting in 2025. Revised code applies three safeguards:
+The configured periods are training through 2024-06-30, validation in 2024H2, and reporting from 2025-01-01 through the configured `TEST_END` (currently 2026-03-21). Revised code applies three safeguards:
 
 1. It removes the final `h` business days of train, validation, and reporting ranges so a label cannot reach into the next partition.
 2. It bounds reporting data by `TEST_END`, instead of accepting every row after `TEST_START`.
 3. It uses `PurgedDateTimeSeriesSplit`, which keeps all tickers from a date together and puts a forward-label embargo before each fold's test dates.
 
-No final metrics have been regenerated with these safeguards. The legacy artefacts are retained for transparency but are not a final evaluation.
+An A/B rerun applied these safeguards and stored source hashes, 20,033 reporting predictions per configuration, confusion matrices, class balance, and benchmarks in `data/processed/rerun_purged_ab_*`. The final usable reporting dates are 2025-01-02 through 2026-03-13 after target availability and purge. C has not yet been rerun; legacy artefacts remain for transparency only.
 
 ## Feature availability and preprocessing
 
@@ -26,7 +26,7 @@ Rows with missing NLP/CV content are filled with neutral values and availability
 
 ## Ablation design
 
-`A` is market-only, `B` adds NLP, and `C` adds CV. `D` additionally has analyst features but is exploratory and invalid for historic performance reporting because it can use current aggregate analyst data. Revised ablations exclude the legacy stacking path because its internal K-fold split is not appropriate for temporal panel data.
+`A` is market-only, `B` adds NLP, and `C` adds CV. Analyst data is isolated to `D`, rather than being silently joined to B/C. D is exploratory and invalid for historic performance reporting because it can use current aggregate analyst data. Revised ablations exclude the legacy stacking path because its internal K-fold split is not appropriate for temporal panel data.
 
 ## Evaluation
 

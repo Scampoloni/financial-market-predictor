@@ -2,7 +2,7 @@
 
 > An AI-assisted research prototype evaluating whether technical market data, financial-news sentiment, and candlestick-image features improve short-horizon equity-direction classification.
 
-> **Key takeaway:** the retained legacy artefacts did not show that the multimodal configurations outperform the market-only configuration. This repository demonstrates an end-to-end applied research workflow and the difficulty of finding robust short-horizon signals in public data; it is not a profitable prediction system.
+> **Key takeaway:** an audited A/B rerun found no robust 5-day directional value: Market-only reached macro F1 0.4918 and Market + NLP 0.4887 in the reporting period. This project demonstrates an end-to-end applied research workflow and the difficulty of finding short-horizon signals in public data; it is not a profitable prediction system.
 
 **Research prototype only.** This project is not a trading system and does not provide investment, financial, or trading advice. Historical outputs do not imply future performance.
 
@@ -14,7 +14,7 @@
 | Universe | 67 large-cap US equities across seven sectors, plus market context data |
 | Core workflow | Collect -> engineer features -> temporally validate -> compare feature blocks -> serve an educational demo |
 | Primary metric | Macro F1, supported by accuracy and per-class precision/recall |
-| Central finding | Legacy results were near chance-level and did not demonstrate robust out-of-sample directional predictability. |
+| Central finding | The audited A/B rerun did not demonstrate robust directional predictability or an NLP improvement over market-only features. |
 
 ## Demo status
 
@@ -58,9 +58,22 @@ The target is the sign of the close-to-close forward return after 5 or 21 tradin
 
 The revised training code uses chronological train, validation, and reporting partitions, purges the forward-label horizon at boundaries, applies `TEST_END`, and uses date-grouped expanding folds with an embargo. This prevents rows for different tickers on one session from being split across a fold.
 
-The saved artefacts pre-date this cleanup. Their results must be treated as **legacy exploratory results**, not a clean final benchmark, because the former split logic did not purge forward-label overlap or apply the configured test end. The analyst configuration is additionally invalid for historical evaluation. Regenerate results with the revised code before publishing a final table.
+The saved legacy artefacts pre-date this cleanup. A and B were rerun with the revised purged protocol and are stored separately with source hashes and prediction rows. C still requires the same rerun; D remains invalid for historical evaluation because it uses non-point-in-time analyst data. The reporting period was previously inspected during project development, so this is an audited reporting evaluation—not a claim that the period was evaluated exactly once.
 
 Details: [methodology.md](docs/methodology.md) and [leakage-audit.md](docs/leakage-audit.md).
+
+## Audited A/B reporting results
+
+`data/processed/rerun_purged_ab_results.json` and `rerun_purged_ab_predictions.parquet` record an A/B run at commit `7702dd3`. Both configurations used 72,159 training rows, 8,308 validation rows, and 20,033 reporting rows. The reporting rows span 2025-01-02 to 2026-03-13; the configured end was purged by five business days for the forward label.
+
+| Configuration | Feature blocks | Selected model | Macro F1 | Accuracy | Balanced accuracy | Comparison |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| A | Market only | LightGBM | 0.4918 | 0.4920 | 0.4935 | Below simple 5-day momentum (0.4962 macro F1). |
+| B | Market + NLP | LightGBM | 0.4887 | 0.4888 | 0.4931 | Below A by 0.0031 macro F1. |
+
+For context, the majority-class baseline scored 0.3506 macro F1 because the reporting class balance was 54.0% UP / 46.0% DOWN. One seeded stratified-random draw scored 0.4982 macro F1; it is shown as a diagnostic, not a stable benchmark estimate. The saved prediction rows reproduce every reported A/B metric.
+
+These results do not support a claim that the NLP block adds predictive value. They are consistent with the difficulty of extracting public-data signals at this horizon, but do not prove market efficiency or absence of any signal.
 
 ## Legacy results: diagnostic only
 
@@ -68,8 +81,8 @@ The existing `data/processed/ablation_results.json` contains the following 5-day
 
 | Configuration | Feature blocks | Stored macro F1 | Interpretation |
 | --- | --- | ---: | --- |
-| A | Market only | 0.4970 | Legacy diagnostic; rerun required with purged splits. |
-| B | Market + NLP | 0.4826 | Below A in this legacy run; sparse direct-news coverage limits interpretation. |
+| A | Market only | 0.4970 | Superseded by the audited A rerun above. |
+| B | Market + NLP + analyst | 0.4826 | Superseded; the legacy B definition improperly included analyst columns. |
 | C | Market + NLP + CV | 0.4861 | Below A in this legacy run; rerun required. |
 | D | C + analyst | 0.4850 | Methodologically invalid for historical reporting because aggregate analyst data is current. |
 
