@@ -14,7 +14,7 @@ Market features are used in A; B adds FinBERT/VADER and derived headline feature
 
 ## Data and evaluation status
 
-The code defines 2020-2024 training, 2024H2 validation, and 2025 reporting partitions. Current stored metrics pre-date the revised purged split and endpoint enforcement, so they are diagnostic only. A future rerun must record the exact dataset version, artefact hash, sample count, class balance, predictions, and metrics.
+The code defines training through 2024-06-30, validation in 2024H2, and reporting through configured `TEST_END`. An audited A/B rerun used purged date-grouped folds, recorded input SHA-256 hashes, and saved 20,033 reporting predictions per configuration. Its market-only macro F1 was 0.4918 and Market + NLP macro F1 was 0.4887. These are reporting results from a period inspected during historical development, so they are not described as a single-use final test. C has not yet been rerun; D remains invalid without point-in-time analyst data.
 
 ## Known failure modes
 

@@ -86,7 +86,7 @@ TRAIN_END = "2024-06-30"
 VAL_START = "2024-07-01"
 VAL_END = "2024-12-31"
 TEST_START = "2025-01-01"
-TEST_END = "2026-03-21"   # aligns with DATA_END_DATE; _temporal_split uses only TEST_START (no upper cap)
+TEST_END = "2026-03-21"   # aligns with DATA_END_DATE; temporal splits apply this upper cap
 
 # Target definition: binary classification
 TARGET_HORIZON_DAYS = 5          # predict 5-trading-day forward return

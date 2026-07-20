@@ -1,0 +1,460 @@
+{
+  "A": {
+    "config": "A",
+    "n_features": 28,
+    "feature_cols": [
+      "return_1d",
+      "return_5d",
+      "return_20d",
+      "rsi_14",
+      "macd",
+      "macd_signal",
+      "macd_hist",
+      "sma_20_ratio",
+      "sma_50_ratio",
+      "ema_12_ratio",
+      "volatility_20d",
+      "atr_14",
+      "bb_upper_dist",
+      "bb_lower_dist",
+      "bb_width",
+      "volume_ratio",
+      "dow_sin",
+      "dow_cos",
+      "month_sin",
+      "month_cos",
+      "vix_level",
+      "sector_Consumer",
+      "sector_Energy",
+      "sector_Finance",
+      "sector_Healthcare",
+      "sector_Industrial",
+      "sector_Insurance",
+      "sector_Technology"
+    ],
+    "sample_sizes": {
+      "train": 72159,
+      "validation": 8308,
+      "reporting": 20033
+    },
+    "class_balance_reporting": {
+      "UP": 0.539859,
+      "DOWN": 0.460141
+    },
+    "selected_model": "LightGBM",
+    "selection_metric": "validation_macro_f1",
+    "selected_model_reporting_metrics": {
+      "macro_f1": 0.491786,
+      "accuracy": 0.491988,
+      "balanced_accuracy": 0.493533,
+      "per_class": {
+        "DOWN": {
+          "precision": 0.453961,
+          "recall": 0.51291,
+          "f1": 0.481638,
+          "support": 9218
+        },
+        "UP": {
+          "precision": 0.533167,
+          "recall": 0.474156,
+          "f1": 0.501933,
+          "support": 10815
+        }
+      },
+      "confusion_matrix_labels": [
+        "DOWN",
+        "UP"
+      ],
+      "confusion_matrix": [
+        [
+          4728,
+          4490
+        ],
+        [
+          5687,
+          5128
+        ]
+      ]
+    },
+    "benchmarks_reporting": {
+      "majority_class": {
+        "macro_f1": 0.35059,
+        "accuracy": 0.539859,
+        "balanced_accuracy": 0.5,
+        "per_class": {
+          "DOWN": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 9218
+          },
+          "UP": {
+            "precision": 0.539859,
+            "recall": 1.0,
+            "f1": 0.70118,
+            "support": 10815
+          }
+        },
+        "confusion_matrix_labels": [
+          "DOWN",
+          "UP"
+        ],
+        "confusion_matrix": [
+          [
+            0,
+            9218
+          ],
+          [
+            0,
+            10815
+          ]
+        ]
+      },
+      "stratified_random_seed_42": {
+        "macro_f1": 0.498173,
+        "accuracy": 0.502471,
+        "balanced_accuracy": 0.49826,
+        "per_class": {
+          "DOWN": {
+            "precision": 0.458208,
+            "recall": 0.445433,
+            "f1": 0.45173,
+            "support": 9218
+          },
+          "UP": {
+            "precision": 0.538295,
+            "recall": 0.551086,
+            "f1": 0.544616,
+            "support": 10815
+          }
+        },
+        "confusion_matrix_labels": [
+          "DOWN",
+          "UP"
+        ],
+        "confusion_matrix": [
+          [
+            4106,
+            5112
+          ],
+          [
+            4855,
+            5960
+          ]
+        ]
+      },
+      "five_day_momentum": {
+        "macro_f1": 0.496208,
+        "accuracy": 0.499576,
+        "balanced_accuracy": 0.496211,
+        "per_class": {
+          "DOWN": {
+            "precision": 0.456031,
+            "recall": 0.454003,
+            "f1": 0.455015,
+            "support": 9218
+          },
+          "UP": {
+            "precision": 0.536385,
+            "recall": 0.538419,
+            "f1": 0.5374,
+            "support": 10815
+          }
+        },
+        "confusion_matrix_labels": [
+          "DOWN",
+          "UP"
+        ],
+        "confusion_matrix": [
+          [
+            4185,
+            5033
+          ],
+          [
+            4992,
+            5823
+          ]
+        ]
+      }
+    },
+    "per_model_train_cv_and_validation": {
+      "RandomForest": {
+        "cv_f1_mean": 0.4966897173364897,
+        "cv_f1_std": 0.02293457379581055,
+        "cv_acc_mean": 0.508163095138831,
+        "fold_f1": [
+          0.4802686272096537,
+          0.5062507260425362,
+          0.5215401538724495,
+          0.5149849928067849,
+          0.460404086751024
+        ],
+        "val_f1_macro": 0.44092329214065784,
+        "val_accuracy": 0.44258545979778524
+      },
+      "LightGBM": {
+        "cv_f1_mean": 0.5079868022509112,
+        "cv_f1_std": 0.02228578346950502,
+        "cv_acc_mean": 0.5208038022179604,
+        "fold_f1": [
+          0.4849668835863537,
+          0.5243745593709893,
+          0.528046978651982,
+          0.5256883535584125,
+          0.4768572360868185
+        ],
+        "val_f1_macro": 0.47771841764152667,
+        "val_accuracy": 0.47917669715936445
+      }
+    }
+  },
+  "B": {
+    "config": "B",
+    "n_features": 51,
+    "feature_cols": [
+      "return_1d",
+      "return_5d",
+      "return_20d",
+      "rsi_14",
+      "macd",
+      "macd_signal",
+      "macd_hist",
+      "sma_20_ratio",
+      "sma_50_ratio",
+      "ema_12_ratio",
+      "volatility_20d",
+      "atr_14",
+      "bb_upper_dist",
+      "bb_lower_dist",
+      "bb_width",
+      "volume_ratio",
+      "dow_sin",
+      "dow_cos",
+      "month_sin",
+      "month_cos",
+      "vix_level",
+      "finbert_sentiment",
+      "finbert_confidence",
+      "vader_sentiment",
+      "news_volume_1d",
+      "headline_avg_length",
+      "sentiment_dispersion",
+      "news_volume_5d",
+      "sentiment_momentum",
+      "is_sentiment_imputed",
+      "sentiment_shift_3d",
+      "sentiment_surprise",
+      "news_volume_zscore",
+      "sentiment_x_volume",
+      "finbert_embed_pca_1",
+      "finbert_embed_pca_2",
+      "finbert_embed_pca_3",
+      "finbert_embed_pca_4",
+      "finbert_embed_pca_5",
+      "finbert_embed_pca_6",
+      "finbert_embed_pca_7",
+      "finbert_embed_pca_8",
+      "finbert_embed_pca_9",
+      "finbert_embed_pca_10",
+      "sector_Consumer",
+      "sector_Energy",
+      "sector_Finance",
+      "sector_Healthcare",
+      "sector_Industrial",
+      "sector_Insurance",
+      "sector_Technology"
+    ],
+    "sample_sizes": {
+      "train": 72159,
+      "validation": 8308,
+      "reporting": 20033
+    },
+    "class_balance_reporting": {
+      "UP": 0.539859,
+      "DOWN": 0.460141
+    },
+    "selected_model": "LightGBM",
+    "selection_metric": "validation_macro_f1",
+    "selected_model_reporting_metrics": {
+      "macro_f1": 0.488734,
+      "accuracy": 0.488843,
+      "balanced_accuracy": 0.493143,
+      "per_class": {
+        "DOWN": {
+          "precision": 0.453997,
+          "recall": 0.547082,
+          "f1": 0.496212,
+          "support": 9218
+        },
+        "UP": {
+          "precision": 0.532213,
+          "recall": 0.439205,
+          "f1": 0.481256,
+          "support": 10815
+        }
+      },
+      "confusion_matrix_labels": [
+        "DOWN",
+        "UP"
+      ],
+      "confusion_matrix": [
+        [
+          5043,
+          4175
+        ],
+        [
+          6065,
+          4750
+        ]
+      ]
+    },
+    "benchmarks_reporting": {
+      "majority_class": {
+        "macro_f1": 0.35059,
+        "accuracy": 0.539859,
+        "balanced_accuracy": 0.5,
+        "per_class": {
+          "DOWN": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 9218
+          },
+          "UP": {
+            "precision": 0.539859,
+            "recall": 1.0,
+            "f1": 0.70118,
+            "support": 10815
+          }
+        },
+        "confusion_matrix_labels": [
+          "DOWN",
+          "UP"
+        ],
+        "confusion_matrix": [
+          [
+            0,
+            9218
+          ],
+          [
+            0,
+            10815
+          ]
+        ]
+      },
+      "stratified_random_seed_42": {
+        "macro_f1": 0.498173,
+        "accuracy": 0.502471,
+        "balanced_accuracy": 0.49826,
+        "per_class": {
+          "DOWN": {
+            "precision": 0.458208,
+            "recall": 0.445433,
+            "f1": 0.45173,
+            "support": 9218
+          },
+          "UP": {
+            "precision": 0.538295,
+            "recall": 0.551086,
+            "f1": 0.544616,
+            "support": 10815
+          }
+        },
+        "confusion_matrix_labels": [
+          "DOWN",
+          "UP"
+        ],
+        "confusion_matrix": [
+          [
+            4106,
+            5112
+          ],
+          [
+            4855,
+            5960
+          ]
+        ]
+      },
+      "five_day_momentum": {
+        "macro_f1": 0.496208,
+        "accuracy": 0.499576,
+        "balanced_accuracy": 0.496211,
+        "per_class": {
+          "DOWN": {
+            "precision": 0.456031,
+            "recall": 0.454003,
+            "f1": 0.455015,
+            "support": 9218
+          },
+          "UP": {
+            "precision": 0.536385,
+            "recall": 0.538419,
+            "f1": 0.5374,
+            "support": 10815
+          }
+        },
+        "confusion_matrix_labels": [
+          "DOWN",
+          "UP"
+        ],
+        "confusion_matrix": [
+          [
+            4185,
+            5033
+          ],
+          [
+            4992,
+            5823
+          ]
+        ]
+      }
+    },
+    "per_model_train_cv_and_validation": {
+      "RandomForest": {
+        "cv_f1_mean": 0.49794305773629743,
+        "cv_f1_std": 0.023020153695614075,
+        "cv_acc_mean": 0.5088301509213707,
+        "fold_f1": [
+          0.4757893798047574,
+          0.5046299102842331,
+          0.5276449624619293,
+          0.5146017252027647,
+          0.46704931092780255
+        ],
+        "val_f1_macro": 0.4431083396666399,
+        "val_accuracy": 0.44451131439576314
+      },
+      "LightGBM": {
+        "cv_f1_mean": 0.5074417586944499,
+        "cv_f1_std": 0.022222387265592194,
+        "cv_acc_mean": 0.5187526056866505,
+        "fold_f1": [
+          0.4823746623185924,
+          0.5235897529800565,
+          0.5281619224319662,
+          0.5247909345940696,
+          0.47829152114756485
+        ],
+        "val_f1_macro": 0.477292460994186,
+        "val_accuracy": 0.4777323062108811
+      }
+    }
+  },
+  "run_metadata": {
+    "created_at_utc": "2026-07-20T10:27:09.546158+00:00",
+    "git_revision": "7702dd3b8c3ee316c78f92f6141e868562f783ca",
+    "target": "5-trading-day forward direction",
+    "reporting_window": "2025-01-01 through 2026-03-21, purged by 5 business days",
+    "cv": "5-fold expanding date-grouped split with 5-business-day embargo",
+    "excluded": [
+      "analyst features",
+      "stacking model",
+      "legacy artefacts"
+    ],
+    "input_sha256": {
+      "features_market.parquet": "d7a3f7be326607d782061c4c61208487772ae503afcb060dd8471c782855f104",
+      "features_nlp.parquet": "999862b316cc14c0ea0ed0a822a446eebced411d986c5a34e91265247b8ce129",
+      "features_cv.parquet": "86007357de91620ba636ebe6a9071122824b702e2baa6d3278c1006f74d6be02"
+    }
+  }
+}
