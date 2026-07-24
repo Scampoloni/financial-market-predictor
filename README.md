@@ -1,4 +1,4 @@
-# Financial Market Predictor
+# Financial Market Signals
 
 An end-to-end AI application that predicts **5-day stock price direction (UP/DOWN)** for 67 S&P 500 stocks by fusing three complementary signal sources: structured market data (ML), financial news sentiment (NLP), and candlestick chart pattern recognition (CV).
 
